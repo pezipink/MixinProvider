@@ -1,0 +1,23 @@
+type project
+owners
+    pezi_pink
+authors 
+    pezi_pink
+projectUrl
+    http://github.com/pezipink/MixinProvider
+iconUrl
+    https://raw.githubusercontent.com/pezipink/MixinProvider/master/docs/files/img/logo.png
+licenseUrl
+    http://github.com/pezipink/MixinProvider/blob/master/LICENSE.txt
+requireLicenseAcceptance
+    false
+copyright
+    Copyright 2015
+tags
+    fsharp f# typeproviders codegen
+summary
+    Type provider for generating F# code via compile time metaprograms
+description
+    Type provider for generating F# code via compile time metaprograms
+
+
