@@ -11,11 +11,6 @@ open System.Reflection
 type ResponseMessage =
     | Good of Assembly
     | Bad of Exception
-//
-//type CompileMessage =
-//    | Compile of source : string * location : string * dynamic : bool * AsyncReplyChannel<ResponseMessage>
-//    | GetBytes of assemblyName : string * AsyncReplyChannel<byte[]>
-//    
 
 type MixinData = 
     { originalSource : string // original metaprogram before any modifications
@@ -137,8 +132,6 @@ type MixinCompiler() =
 //                | Some s -> metaprogram.Replace(s, sprintf "%s\n[<AutoOpen>]module %s=\n" s moduleName )
 //                | None -> sprintf "[<AutoOpen>]module %s=\n%s" moduleName metaprogram
 
-        File.AppendAllText("I:\\mixin.tmp", sprintf "entering compile on thread %A %A\n" System.Threading.Thread.CurrentThread.ManagedThreadId id) 
-                                  
         if File.Exists sourceFile then File.Delete sourceFile
         if File.Exists dllFile then File.Delete dllFile
                         
@@ -147,7 +140,6 @@ type MixinCompiler() =
                         @ references
                         |> List.toArray
                                
-        File.AppendAllText("I:\\mixin.tmp", sprintf "getting fsi on thread %A %A\n" System.Threading.Thread.CurrentThread.ManagedThreadId id) 
         let fsi = getFsiSession()     
         try       
             fsi.EvalInteraction metaprogram                            
@@ -155,7 +147,6 @@ type MixinCompiler() =
             | Some x -> 
                 let source = x.ReflectionValue :?> string
                 let source = sprintf "[<AutoOpen>]module %s\n%s" moduleName source
-                File.AppendAllText("I:\\mixin.tmp", sprintf "compiling on thread %A %A\n" System.Threading.Thread.CurrentThread.ManagedThreadId id) 
                 File.WriteAllText(sourceFile, source)
                 let args = args dllFile
                 let errors, code = scs.Compile args
@@ -163,10 +154,8 @@ type MixinCompiler() =
                 let asm = Assembly.LoadFrom dllFile
                 if state.ContainsKey asmName then state.Remove asmName |> ignore
                 state.Add(asmName, {originalSource=metaprogram; assemblyLocation = dllFile; assembly = asm; metaprogramParams = metaprogramParams })
-                File.AppendAllText("I:\\mixin.tmp", sprintf "good exit on thread %A %A\n" System.Threading.Thread.CurrentThread.ManagedThreadId id) 
                 Good asm
             | _ -> 
-                File.AppendAllText("I:\\mixin.tmp", sprintf "bad exit on thread %A %A\n" System.Threading.Thread.CurrentThread.ManagedThreadId id) 
                 Bad (new Exception("metaprogram failed"))
         with
         | ex -> Bad (Exception(sbErr.ToString(), ex))
