@@ -7,7 +7,7 @@ The Mixin Provider is essentially a very powerful code generator that executes a
 There are two main modes for use.
 
 ###Mixin Lite
-This usage mode is called "lite" because it suffers from some of the same problems as a traditional F# generative type provider - nameley, you cannot use any F# speical types such as records, DUs and type providers.  However, you are stil able to generate any F# code, it's just you will only be presented with them as normal .NET types.  
+This usage mode is called "lite" because it suffers from some of the same problems as a traditional F# generative type provider - namely, you cannot use any F# speical types such as records, DUs and type providers.  However, you are stil able to generate any F# code, it's just you will only be presented with them as normal .NET types.  
 
 You use mxins in this mode by simply aliasing the type provider and metaprogram, and then in the same program you access the types it has generated via the type provider, exactly like a normal type provider.
 
