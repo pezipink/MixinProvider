@@ -1,4 +1,4 @@
-module MixinProvider.CodeGen.Tests
+module MixinProvider.SquirrelGen.Tests
 
 open MixinProvider
 open NUnit.Framework
@@ -75,8 +75,8 @@ let ``squirrels``() =
             newli;
             cmodule "TestTypes"
                 [
-                    crecordType "RecordType" [("x","int");("y","long")] [];
-                    crecordType "RecordTypeWithMembers" [("x","int");("y","long")] 
+                    crecord "RecordType" [("x","int");("y","long")] [];
+                    crecord "RecordTypeWithMembers" [("x","int");("y","long")] 
                         [
                             cmember (Instance "this") "private" "test" (Partial ["x",Some "int"]) 
                                 (api "{ this with x = x }" )
@@ -84,7 +84,7 @@ let ``squirrels``() =
                                 (api "{ this with y = y }" )
                     
                         ]; 
-                    crecordType "RecordType" [("x","int");("y","long")] [];
+                    crecord "RecordType" [("x","int");("y","long")] [];
                 ]
         ] 
     |> ignore

@@ -57,7 +57,7 @@
   <Import Project="$(FSharpTargetsPath)" />
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
   <ItemGroup>
-    <Compile Include="CodeGenTests.fs" />
+    <Compile Include="SquirrelGenTests.fs" />
     <Compile Include="MixinTests.fs" />
     <None Include="..\..\src\MixinProvider\TestMetaprograms\Basic.fsx">
       <Link>Metaprogams\Basic.fsx</Link>
