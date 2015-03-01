@@ -4,7 +4,7 @@
 namespace MixinProvider
 
 [<AutoOpen>]
-module CodeGen =
+module SquirrelGen =
     open System
     open System.Text
     type sb = StringBuilder
@@ -20,7 +20,9 @@ module CodeGen =
     let ap (text:string) (sb:sb) = sb.Append text
 
     /// appends an escaped, quoted string from a string
-    let str (text:string) (sb:sb) = sb.AppendFormat("\"{0}\"", text) //todo : escaping
+    let str (text:string) = sprintf "\"%s\""text  //todo : escaping
+
+    let stra (text:string) (sb:sb) = sb.AppendFormat("\"{0}\"", text) //todo : escaping
 
     let space = spaces 1
 
@@ -62,9 +64,9 @@ module CodeGen =
     type ArgsType =
         | Partial of (string * string option) list
         | Tuple of (string * string option) list
-        | NoArgs
+        | NoArgs  
 
-    /// creates a member defintion at the given indent level
+           /// creates a member defintion at the given indent level
     /// memberType - static, or instance with a self identifier value
     /// qualifer - any qualifiying string eg private
     /// name - the name of the member
@@ -92,7 +94,7 @@ module CodeGen =
         indent indentLevel
         >> ap stat >> ap qualifier >> space >> ap "member " >> ap ident >> ap "." >> ap name >> ap signature >> ap " = " >> newl
         >> (impl (indentLevel + 1))
-
+  
     /// appends "with.." at the indent level then calls the impl function with
     /// indentLevel+1 (this function should be formed from a composition of 
     /// cmember, cinterface etc)
@@ -104,12 +106,20 @@ module CodeGen =
 
     ///creates a record type at indent level with the specified fields
     ///and optionally a function list with member / interface implementations
-    let crecordType name fields members indentLevel =
+    let crecord name fields members indentLevel =
         indent indentLevel 
         >> ap "type " >> ap name >> space >> ap " = "
         >> ap(wrapBraces (join "; " (List.map(fun (p,t) -> annoParam p t) fields))) >> newl
         >> cwithMembers members indentLevel
 
+
+    let instRecord assignments =
+        assignments 
+        |> List.map(fun (f,v) -> sprintf "%s = %s; " f v) 
+        |> join ""
+        |> wrapBraces
+        |> ap
+        
     /// creates a single union type case with any amount of type arguments
     /// that can optionally be named (F# 4)
     /// type args should be in the form (name,type name) where name can be blank
@@ -177,11 +187,15 @@ module CodeGen =
 
     /// this function is used to insert the equivalent of #r directives
     /// at the top of your file.  Whilst the resulting program is not a 
-    /// interactvie file, the mixin compiler will strip these out and 
-    /// pass them along to the fsc as -r arguments.
+    /// interactvie file, the mixin compiler will extract these and 
+    /// pass them along to the fsc as -r arguments. The #if MIXIN is
+    /// just a dummy so the compiler ignores this block
     let genReferences references =
         let r loc = sprintf "#r @\"%s\"" loc
-        join "\n" (List.map r references)
+        ap "#if MIXIN  \n" 
+        >> ap (join "\n" (List.map r references)) 
+        >> newl
+        >> ap "#endif\n"
         
        
     /// creates an if .. then .. else expression, the functions 

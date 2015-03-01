@@ -47,9 +47,11 @@ type MixinProvider() =
             let metaprogram =
                 let arg = staticArguments.[0] :?> string
                 let fi = FileInfo(Assembly.GetExecutingAssembly().Location)
-                let fn = Path.Combine(fi.DirectoryName, arg)
-                if File.Exists fn then fn
-                else arg
+                try
+                    let fn = Path.Combine(fi.DirectoryName, arg)               
+                    if File.Exists fn then fn
+                    else arg
+                with _ -> arg
             
             lock mix (fun _ -> 
 

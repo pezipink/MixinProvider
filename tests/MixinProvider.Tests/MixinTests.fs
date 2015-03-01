@@ -1,13 +1,17 @@
 ﻿module MixinProvider.Mixin.Tests
 
-open MixinProvider
+
 open NUnit.Framework
 open System.Text
 open System.Diagnostics
 
 
+open MixinProvider
+
+type FirstTest = mixin_gen< """let generate() = "let x = 42" """ >
+
 // generates a x = 42
-type Test = mixin_gen< "TestMetaprograms\\basic.fsx" >
+type Basic_Test = mixin_gen< "TestMetaprograms\\basic.fsx" >
 
 
 // This is RECURSIVE! The DSL metaprogram also references
@@ -20,3 +24,6 @@ type DSL_Test = mixin_gen< "TestMetaprograms\\DSL.fsx" >
 type Test_Params = mixin_gen< "TestMetaprograms\\basic_params.fsx", metaprogramParameters = "5 20" >
 
 
+type ConnectionString_Test = mixin_gen<"TestMetaprograms\\connectionstring.fsx", metaprogramParameters = "\"John\"" >
+
+//type Excel_Test = mixin_gen< "TestMetaprograms\\excel.fsx" >

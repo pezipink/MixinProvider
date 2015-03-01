@@ -1,7 +1,6 @@
-﻿#load @"F:\GIT\MixinProvider\src\MixinProvider\CodeGenDSL.fs"
+﻿#load @"F:\GIT\MixinProvider\src\MixinProvider\SquirrelGen.fs"
 #r @"F:\GIT\MixinProvider\bin\MixinProvider.dll"
 open System.Text
-open MixinProvider.CodeGen
 open MixinProvider
 type Test2 = mixin_gen< "TestMetaprograms\\basic.fsx" >
 
@@ -16,8 +15,8 @@ let generate() =
             newli;
             cmodule "TestTypes"
                 [
-                    crecordType "RecordType" [("x","int");("y","int")] [];
-                    crecordType "RecordTypeWithMembers" [("x","int");("y","int")] 
+                    crecord "RecordType" [("x","int");("y","int")] [];
+                    crecord "RecordTypeWithMembers" [("x","int");("y","int")] 
                         [
                             cmember (Instance "this") "" "testX" (Partial ["x",Some "int"]) 
                                 (api "{ this with x = x }" )
@@ -25,7 +24,7 @@ let generate() =
                                 (api "{ this with y = y }" )
                     
                         ]; 
-                    crecordType "RecordTypeAgain" [("x","int");("y","int")] [];
+                    crecord "RecordTypeAgain" [("x","int");("y","int")] [];
                 ]
         ] 
     |> ignore

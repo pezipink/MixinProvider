@@ -1,1 +1,1 @@
-﻿let generate() = "[<Literal>]let x = 42" 
+﻿let generate() = "let x = 42" 

@@ -48,17 +48,23 @@
   <ItemGroup>
     <Compile Include="Compiler.fs" />
     <Compile Include="MixinProvider.fs" />
-    <Compile Include="CodeGenDSL.fs" />
+    <Compile Include="SquirrelGen.fs" />
     <None Include="Script.fsx" />
     <None Include="paket.references" />
     <None Include="paket.template" />
-    <None Include="TestMetaprograms\Basic.fsx">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Include="TestMetaprograms\Basic_Params.fsx">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="TestMetaprograms\ConnectionString.fsx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="TestMetaprograms\DSL.fsx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="TestMetaprograms\Basic.fsx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="TestMetaprograms\Excel.fsx">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

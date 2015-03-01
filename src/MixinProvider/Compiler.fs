@@ -13,11 +13,14 @@ type ResponseMessage =
     | Bad of Exception
 
 type MixinData = 
-    { originalSource : string // original metaprogram before any modifications
+    { originalSource : string 
       assemblyLocation : string
       metaprogramParams : string
       assembly : Assembly }
  
+type PathResolutionMode =
+    | Relative
+    | Absolute
 
 // this is an enum so it can be used as a static param to the tp
 type CompileMode =
@@ -109,7 +112,6 @@ type MixinCompiler() =
     let sbOut = new StringBuilder()
     let sbErr = new StringBuilder()
     let getFsiSession() =
-        
         let inStream = new StringReader("")
         let outStream = new StringWriter(sbOut)
         let errStream = new StringWriter(sbErr)                
@@ -123,22 +125,20 @@ type MixinCompiler() =
 
     let state = new Dictionary<_,MixinData>()
     let internalCompile asmName moduleName (metaprogram:string) metaprogramParams sourceFile dllFile = 
-//        let preparedMetaprogram =
-//            metaprogram.Split('\n') 
-//            |> Seq.toList
-//            |> List.rev 
-//            |> List.tryFind(fun s-> s.StartsWith "#r" || s.StartsWith "#load") 
-//            |> function
-//                | Some s -> metaprogram.Replace(s, sprintf "%s\n[<AutoOpen>]module %s=\n" s moduleName )
-//                | None -> sprintf "[<AutoOpen>]module %s=\n%s" moduleName metaprogram
+        let preparedProgram (source:string) =
+            let regex = """#r @?(".+?")+"""
+            let matches = RegularExpressions.Regex.Matches(source,regex)
+            let source = sprintf "[<AutoOpen>]module %s\n%s" moduleName source
+            source, matches |> Seq.cast<RegularExpressions.Match> |> Seq.map(fun m ->m.Value) |> Seq.toList
 
         if File.Exists sourceFile then File.Delete sourceFile
         if File.Exists dllFile then File.Delete dllFile
                         
-        let references = List.fold(fun acc l -> "-r" :: l :: acc) [] referenceArguments 
-        let args o = [ "fsc.exe"; "-o"; o; "-a"; sourceFile; "--noframework"; "--validate-type-providers"; "--fullpaths"; "--flaterrors" ] 
-                        @ references
-                        |> List.toArray
+        let generateReferences references = List.fold(fun acc l -> "-r" :: l :: acc) [] (referenceArguments @ references)
+        let args output references = 
+            [ "fsc.exe"; "-o"; output; "-a"; sourceFile; "--noframework"; "--validate-type-providers"; "--fullpaths"; "--flaterrors" ] 
+            @ generateReferences references
+            |> List.toArray
                                
         let fsi = getFsiSession()     
         try       
@@ -147,9 +147,12 @@ type MixinCompiler() =
             match fsi.EvalExpression expr with
             | Some x -> 
                 let source = x.ReflectionValue :?> string
-                let source = sprintf "[<AutoOpen>]module %s\n%s" moduleName source
+                // extract any #r tags from the source and feed them in as -r compiler options
+                // these will be hidden in an #if MIXIN block so it doesn't do anything.
+                // also wrap the code in a module with the type name the TP is expecting
+                let source, refs = preparedProgram source
                 File.WriteAllText(sourceFile, source)
-                let args = args dllFile
+                let args = args dllFile refs
                 let errors, code = scs.Compile args
                 if code > 0 then Bad (Exception(String.Join("\n", errors))) else
                 let asm = Assembly.LoadFrom dllFile
@@ -164,7 +167,7 @@ type MixinCompiler() =
     member this.Compile(metaprogram,moduleName,mode,outputLoc,metaprogramParams) =
         let asmName = sprintf "%s, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null" moduleName
         let current = FileInfo(Assembly.GetExecutingAssembly().Location).Directory
-        let metaFileLoc = Path.Combine(current.FullName,metaprogram)
+        let metaFileLoc = try Path.Combine(current.FullName,metaprogram) with _ -> ""
         let fsFile, dllFile = 
             let name =
                 if String.IsNullOrWhiteSpace outputLoc then Path.Combine(current.FullName,moduleName)        
@@ -175,6 +178,10 @@ type MixinCompiler() =
             let fsFile = Path.ChangeExtension(name, ".fs")
             let dllFile = Path.ChangeExtension(name, ".dll")          
             fsFile,dllFile
+        
+        let getSource() =
+            try if  (not (String.IsNullOrWhiteSpace metaFileLoc)) && File.Exists metaFileLoc then File.ReadAllText metaFileLoc else metaprogram
+            with _ -> metaprogram
          
         match mode with 
         | CompileMode.NeverCompile ->
@@ -186,12 +193,12 @@ type MixinCompiler() =
                     asm
                 else failwithf "Compile Mode was set to Never Compile, but the assembly %s could not be found in the cache." asmName
         | CompileMode.AlwaysCompile ->
-            let metaprogram = if File.Exists metaFileLoc then File.ReadAllText metaFileLoc else metaprogram
+            let metaprogram = getSource()
             match internalCompile asmName moduleName metaprogram metaprogramParams fsFile dllFile with
             | Good asm -> asm
             | Bad ex -> raise ex
         | CompileMode.IntelligentCompile -> 
-            let metaprogram = if File.Exists metaFileLoc then File.ReadAllText metaFileLoc else metaprogram
+            let metaprogram = getSource()
             match state.TryGetValue asmName with
             | true, value when value.originalSource = metaprogram 
                             && value.assemblyLocation = dllFile 
