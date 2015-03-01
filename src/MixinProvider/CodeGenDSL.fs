@@ -174,6 +174,15 @@ module CodeGen =
 
     let clambda args impl indentLevel =
         ap "fun " >> args >> ap " -> " >> impl (indentLevel+1)
+
+    /// this function is used to insert the equivalent of #r directives
+    /// at the top of your file.  Whilst the resulting program is not a 
+    /// interactvie file, the mixin compiler will strip these out and 
+    /// pass them along to the fsc as -r arguments.
+    let genReferences references =
+        let r loc = sprintf "#r @\"%s\"" loc
+        join "\n" (List.map r references)
+        
        
     /// creates an if .. then .. else expression, the functions 
     /// passed for to create the branch implementations are 

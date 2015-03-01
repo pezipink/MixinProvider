@@ -143,7 +143,8 @@ type MixinCompiler() =
         let fsi = getFsiSession()     
         try       
             fsi.EvalInteraction metaprogram                            
-            match fsi.EvalExpression "generate()" with
+            let expr = if String.IsNullOrWhiteSpace metaprogramParams then "generate()" else "generate " + metaprogramParams
+            match fsi.EvalExpression expr with
             | Some x -> 
                 let source = x.ReflectionValue :?> string
                 let source = sprintf "[<AutoOpen>]module %s\n%s" moduleName source
