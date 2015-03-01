@@ -2,6 +2,9 @@
 [![Issue Stats](http://issuestats.com/github/pezipink/MixinProvider/badge/pr)](http://issuestats.com/github/pezipink/MixinProvider)
 
 # MixinProvider
+
+You can read an introduction post on my blog here http://pinksquirrellabs.com/post/2015/03/01/Introducing-The-Mixin-Type-Provider.aspx
+
 The Mixin Provider is essentially a very powerful code generator - it evaluates an F# metaprogram at compile time, and compiles the resulting program to an assembly.  
 
 In a way, this is not a type provider at all, though in "lite" mode it will give you limited access to types - very similar to generative type providers. However, that is just a nice bonus, you should view this as a fully powered code generator that leverages the fact that type providers are compiler extensions, in order to hook the generation process directly into the normal F# compilation process.
