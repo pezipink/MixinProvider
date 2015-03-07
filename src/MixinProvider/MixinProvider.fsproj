@@ -49,6 +49,7 @@
     <Compile Include="Compiler.fs" />
     <Compile Include="MixinProvider.fs" />
     <Compile Include="SquirrelMix.fs" />
+    <Compile Include="MixinMini.fs" />
     <None Include="Script.fsx" />
     <None Include="paket.references" />
     <None Include="paket.template" />
@@ -67,6 +68,7 @@
     <None Include="TestMetaprograms\Excel.fsx">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="TestMetaprograms\MiniMixins.fsx" />
   </ItemGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>

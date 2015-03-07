@@ -104,6 +104,13 @@ module SquirrelMix =
         | fs -> indent indentLevel >> ap "with" >> newl 
                 >> mapPipe(fun f -> f (indentLevel+1) >> newl) fs
 
+    /// todo:generics
+    let ctype name args inheritFrom indentLevel =
+        indent indentLevel
+        >> ap "type " >> ap name
+        >> ap(wrapBraces (join "; " (List.map(fun (p,t) -> annoParam p t) args))) >> newl
+        >> (if inheritFrom = "" then id else ap "inherit " >> ap inheritFrom)
+        
     ///creates a record type at indent level with the specified fields
     ///and optionally a function list with member / interface implementations
     let crecord name fields members indentLevel =
@@ -190,19 +197,26 @@ module SquirrelMix =
     let clambda args impl indentLevel =
         ap "fun " >> args >> ap " -> " >> impl (indentLevel+1)
 
-    /// this function is used to insert the equivalent of #r directives
+    /// this function is used to insert the equivalent of #I and #r directives
     /// at the top of your file.  Whilst the resulting program is not a 
-    /// interactvie file, the mixin compiler will extract these and 
+    /// interactive file, the mixin compiler will extract these, resolve, and 
     /// pass them along to the fsc as -r arguments. The #if MIXIN is
     /// just a dummy so the compiler ignores this block
-    let genReferences references =
+    let genReferences locations references =
         let r loc = sprintf "#r @\"%s\"" loc
+        let i loc = sprintf "#I @\"%s\"" loc
         ap "#if MIXIN  \r\n" 
+        >> ap (join "\r\n" (List.map i locations)) 
+        >> newl
         >> ap (join "\r\n" (List.map r references)) 
         >> newl
         >> ap "#endif\r\n"
         
-       
+    let copen opens indentLevel =
+        ap (join "\r\n" (List.map (sprintf "open %s\r\n") opens)) >> newl
+
+
+           
     /// creates an if .. then .. else expression, the functions 
     /// passed for to create the branch implementations are 
     /// always applied with indentLevel+1
