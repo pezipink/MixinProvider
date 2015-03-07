@@ -30,6 +30,8 @@ module SquirrelMix =
 
     let api text indentLevel  = indent indentLevel >> ap text
 
+    
+
     /// appends a newline character
     let newl (sb:sb) = sb.AppendLine() 
 
@@ -59,8 +61,10 @@ module SquirrelMix =
 
     type MemberType =
          | Instance of identifier : string 
+         | InstanceOverride of identifier : string
          | Static
-
+         | StaticOverride
+         
     type ArgsType =
         | Partial of (string * string option) list
         | Tuple of (string * string option) list
@@ -80,8 +84,9 @@ module SquirrelMix =
     ///        the body of the member
     /// TODO - generic arguments
     let cmember memberType qualifier name args impl indentLevel =
-        let stat = memberType |> function Instance _ -> "" | _ -> "static"
-        let ident = memberType |> function Instance id -> id | _ -> ""
+        let stat = memberType |> function Instance _ | InstanceOverride _ -> "" | _ -> "static "
+        let ident = memberType |> function Instance id | InstanceOverride id -> id | _ -> ""
+        let mem = memberType |> function InstanceOverride _ | StaticOverride -> "override " | _ -> "member "
         let signature = 
             match args with 
             | Partial args ->
@@ -92,7 +97,7 @@ module SquirrelMix =
                 wrapParens (join ", " (List.map cp args))
             | NoArgs ->"()" 
         indent indentLevel
-        >> ap stat >> ap qualifier >> space >> ap "member " >> ap ident >> ap "." >> ap name >> ap signature >> ap " = " >> newl
+        >> ap stat >> ap qualifier >> space >> ap mem >> ap ident >> ap "." >> ap name >> ap signature >> ap " = " >> newl
         >> (impl (indentLevel + 1))
   
     /// appends "with.." at the indent level then calls the impl function with
@@ -105,11 +110,18 @@ module SquirrelMix =
                 >> mapPipe(fun f -> f (indentLevel+1) >> newl) fs
 
     /// todo:generics
-    let ctype name args inheritFrom indentLevel =
+    let ctype name args inheritFrom members indentLevel =
         indent indentLevel
-        >> ap "type " >> ap name
-        >> ap(wrapBraces (join "; " (List.map(fun (p,t) -> annoParam p t) args))) >> newl
-        >> (if inheritFrom = "" then id else ap "inherit " >> ap inheritFrom)
+        >> ap "type " >> ap name 
+        >> ap(wrapParens (join "; " (List.map(fun (p,t) -> annoParam p t) args))) >> ap " =" >> newl
+        >> (if inheritFrom = "" then id else indent (indentLevel+1) >> ap "inherit " >> ap inheritFrom) >> newl
+        >> cwithMembers members (indentLevel+1)
+    
+    let carray members indentLevel =
+        indent indentLevel
+        >> ap "[|" >> newl
+        >> (if List.isEmpty members then id else mapPipe(fun f -> f (indentLevel+1) >> ap ";" >> newl) members)
+        >> indent indentLevel >> ap "|]" >> newl
         
     ///creates a record type at indent level with the specified fields
     ///and optionally a function list with member / interface implementations
@@ -178,6 +190,12 @@ module SquirrelMix =
     let clet identifier impl indentLevel =
         indent indentLevel
         >> ap "let " >> ap identifier >> ap " = " >> impl 
+    
+    /// takes a list of functions, applies indentLevel >> newl to each, 
+    /// then composes the whole lot into one mega function.  Use this function
+    /// whenever you want to use a bunch of the other functions in one indent block,
+    /// eg when implementing functions / members.
+    let ccode impl indentLevel = mapPipe(fun f -> f indentLevel >> newl) impl
 
     /// creates module with the given name, the list of 
     /// implementation functions have indentLevel+1 applied 
@@ -202,7 +220,7 @@ module SquirrelMix =
     /// interactive file, the mixin compiler will extract these, resolve, and 
     /// pass them along to the fsc as -r arguments. The #if MIXIN is
     /// just a dummy so the compiler ignores this block
-    let genReferences locations references =
+    let genReferences locations references indentLevel =
         let r loc = sprintf "#r @\"%s\"" loc
         let i loc = sprintf "#I @\"%s\"" loc
         ap "#if MIXIN  \r\n" 
@@ -213,10 +231,10 @@ module SquirrelMix =
         >> ap "#endif\r\n"
         
     let copen opens indentLevel =
+        
         ap (join "\r\n" (List.map (sprintf "open %s\r\n") opens)) >> newl
 
 
-           
     /// creates an if .. then .. else expression, the functions 
     /// passed for to create the branch implementations are 
     /// always applied with indentLevel+1

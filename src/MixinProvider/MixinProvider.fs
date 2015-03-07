@@ -9,8 +9,6 @@ open Microsoft.FSharp.Compiler.SimpleSourceCodeServices
 open Microsoft.FSharp.Quotations
 open MixinCompiler
 
-type mixin_gen() = inherit obj()
-
 module helpers =
     let intParameter name (def:int option) =
       let def' = 
@@ -53,6 +51,8 @@ module helpers =
         override this.DefaultValue with get() =  def
         override this.Attributes with get() = ParameterAttributes.Optional }
 
+type mixin_gen() = inherit obj()
+
 [<TypeProvider>]
 type MixinProvider() =
     static let mix = new MixinCompiler()
@@ -74,10 +74,10 @@ type MixinProvider() =
     default x.AvailableTypes() = [| typeof<mixin_gen> |]
             
 //    abstract member ExecuteMixinCompile : Type * string array * string * string * MixinCompiler.CompileMode * string * string -> Type 
-    member x.ExecuteMixinCompile(typeWithoutArguments,typePathWithArguments:string[],metaprogram,moduleName,compileMode,outputLoc,mpParams) = 
+    member x.ExecuteMixinCompile(typeWithoutArguments,typePathWithArguments:string[],metaprogram,moduleName,compileMode,outputLoc,mpParams,generationMode) = 
         lock mix (fun _ -> 
             try
-                let asm = mix.Compile(metaprogram,moduleName,compileMode,outputLoc,mpParams) 
+                let asm = mix.Compile(metaprogram,moduleName,compileMode,outputLoc,mpParams,generationMode) 
                 if x.AvailableTypes() |> Array.exists((=) typeWithoutArguments) then
                     asm.GetType(typePathWithArguments.[typePathWithArguments.Length-1])
                 else asm.GetType(typeWithoutArguments.FullName)
@@ -88,19 +88,24 @@ type MixinProvider() =
     default x.ApplyStaticArgs(typeWithoutArguments: Type, typePathWithArguments: string [], staticArguments: obj []): Type = 
         let mpParams = staticArguments.[1] :?>  string
         let compileMode = staticArguments.[2] :?> CompileMode
-        let outputLoc = staticArguments.[3] :?>  string
+        let generationMode = staticArguments.[3] :?>  GenerationMode
+        let outputLoc = staticArguments.[4] :?>  string
         let moduleName = typePathWithArguments.[typePathWithArguments.Length-1]
         let metaprogram = resolveMetaprogram(staticArguments.[0] :?> string)
-        x.ExecuteMixinCompile(typeWithoutArguments, typePathWithArguments, metaprogram, moduleName, compileMode, outputLoc, mpParams)
+        x.ExecuteMixinCompile(typeWithoutArguments, typePathWithArguments, metaprogram, moduleName, compileMode, outputLoc, mpParams,generationMode)
  
     abstract member StaticParameters : unit -> ParameterInfo array
     default x.StaticParameters() =
         [| 
             helpers.stringParameter "metaprogram" None;                
             helpers.stringParameter "metaprogramParameters" (Some "");
-            helpers.genericOptionalParameter "compileMode" CompileMode.CompileWhenChanged
+            helpers.genericOptionalParameter "compileMode" CompileMode.CompileWhenMissisng
+            helpers.genericOptionalParameter "generationMode" GenerationMode.AutoOpenModule
             helpers.stringParameter "outputLocation" (Some "")
         |]
+
+    abstract member GetNamespace : unit -> string
+    default x.GetNamespace() = "MixinProvider"
 
     interface ITypeProvider with
         member x.ApplyStaticArguments(typeWithoutArguments: Type, typePathWithArguments: string [], staticArguments: obj []): Type = 
@@ -142,10 +147,11 @@ type MixinProvider() =
             x.AvailableTypes()
         
         member x.NamespaceName: string = 
-            "MixinProvider"
+            x.GetNamespace()
         
         member x.ResolveTypeName(typeName: string): Type = 
             x.ResolveType(typeName)
+
 
 [<assembly:TypeProviderAssembly>]
 do  

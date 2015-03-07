@@ -1,5 +1,5 @@
 ﻿#r @"F:\GIT\SqlProvider\bin\FSharp.Data.SqlProvider.dll" 
-#load "F:\GIT\MixinProvider\src\MixinProvider\SquirrelGen.fs"
+#load "F:\GIT\MixinProvider\src\MixinProvider\SquirrelMix.fs"
 
 
 [<Literal>] 
@@ -10,6 +10,7 @@ open MixinProvider
 open System.Text
 
 type sql = SqlDataProvider<Common.DatabaseProviderTypes.ODBC, peopleCs>
+
 let ctx = sql.GetDataContext()
 
 let generate() =
@@ -26,10 +27,10 @@ let generate() =
         
         // create record instantiation
         let record = 
-            instRecord
-               ["firstName", str firstName
-                "lastName", str lastName
-                "age", age            ]
+            irecord
+                ["firstName", str firstName
+                 "lastName", str lastName
+                 "age", age            ]
         
         // create let expression    
         clet fullName record

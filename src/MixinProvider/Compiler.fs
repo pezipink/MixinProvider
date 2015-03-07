@@ -13,8 +13,7 @@ type ResponseMessage =
     | Bad of Exception
 
 type MixinData = 
-    { originalSource : string 
-      assemblyLocation : string
+    { assemblyLocation : string
       metaprogramParams : string
       assembly : Assembly }
  
@@ -32,19 +31,26 @@ type CompileMode =
     /// Compile when missing will generate an assembly
     /// only if one does not already exist in the expected
     /// location
-    | CompileWhenMissisng = 0
-    /// Intelligent compilation mode will only re-compile 
-    /// assemblies when a change in the metaprogram is detected
-    /// note this only works in lieu of the currnent type provider
-    /// session 
-    | CompileWhenChanged = 1
+    | CompileWhenMissisng = 0   
     /// AlwaysCompile will force assemblies to be re-compiled 
     /// every time the type provider fires - be warned this can 
     /// have a large overhead due to the background compiler.
     /// This option is reccomended as a temporary switch if you
     /// wish to force recompilation for some reason
-    | AlwaysCompile = 2
+    | AlwaysCompile = 1
     
+type GenerationMode =
+    /// Default, would be used for most mixins
+    | AutoOpenModule = 0
+    /// Use this if you don't want to pollute your namespace
+    | Module = 1
+    /// Namespace is for generating type providers or if you 
+    /// Just want types in a namespace.
+    | Namespace = 2
+
+type SourceType =
+    | File of string
+    | Text of string
     
 type MixinCompiler() =
     // TODO : Mono support
@@ -120,17 +126,16 @@ type MixinCompiler() =
     let getFsiSession() =
         let inStream = new StringReader("")
         let outStream = new StringWriter(sbOut)
-        let errStream = new StringWriter(sbErr)                
-        let argv = [| "fsi.exe" |]
-        let allArgs = Array.append argv [|"--debug+"; "--define:MIXIN"|]
+        let errStream = new StringWriter(sbErr)                        
+        let argv = [| "fsi.exe"; "--nologo"; "--debug:full"; "--define:MIXIN"; |]        
         let fsiConfig = FsiEvaluationSession.GetDefaultConfiguration()
-        FsiEvaluationSession.Create(fsiConfig, allArgs, inStream, outStream, errStream)
+        FsiEvaluationSession.Create(fsiConfig, argv, inStream, outStream, errStream)
 
     let fsc = SimpleSourceCodeServices()
 
     let state = new Dictionary<_,_>()
     
-    let internalCompile asmName moduleName (metaprogram:string) metaprogramParams sourceFile dllFile = 
+    let internalCompile asmName moduleName (metaprogram) metaprogramParams sourceFile dllFile (generationMode:GenerationMode) = 
         let getMatches input regex =
             RegularExpressions.Regex.Matches(input,regex)
             |> Seq.cast<RegularExpressions.Match> 
@@ -141,7 +146,7 @@ type MixinCompiler() =
             let referenceRegex = """#r @?(".+?")+"""
             let includeRegex = """#I @?(".+?")+"""
             let currentDir = FileInfo(Assembly.GetExecutingAssembly().Location).Directory.FullName
-            let rmatches = getMatches source referenceRegex
+            let rmatches = getMatches source referenceRegex |> List.map(fun r -> r.Replace("#r","").Replace("@","").Replace("\"","").Trim())
             //reverse list so currentDir is always checked after user specified ones
             let imatches = getMatches source includeRegex 
                            |> List.map(fun i -> 
@@ -149,6 +154,7 @@ type MixinCompiler() =
                             else Path.GetFullPath(Path.Combine(currentDir,i)))
                            |> fun i -> currentDir :: i
                            |> List.rev
+                           |> List.map(fun r -> r.Replace("#r","").Replace("@","").Replace("\"","").Trim())
             //attempt to find a full path to each referenced assembly by combining
             //each resolution path in turn, picking the first one that matches
             let references =
@@ -166,7 +172,12 @@ type MixinCompiler() =
                                       r imatches
                 )
 
-            let source = sprintf "[<AutoOpen>]module %s\n%s" moduleName source
+            let source =
+                match generationMode with
+                | GenerationMode.AutoOpenModule -> sprintf "[<AutoOpen>]module %s\n%s" moduleName source
+                | GenerationMode.Module -> sprintf "[<AutoOpen>]module %s\n%s" moduleName source
+                | GenerationMode.Namespace -> sprintf "namespace %s\n%s" moduleName source
+                | failwith ->"impossible"
             source, references
 
         if File.Exists sourceFile then File.Delete sourceFile
@@ -174,18 +185,46 @@ type MixinCompiler() =
                         
         let generateReferences references = List.fold(fun acc l -> "-r" :: l :: acc) [] (defaultReferences @ references)
         let args output references = 
-            [ "fsc.exe"; "-o"; output; "-a"; sourceFile; "--noframework"; "--validate-type-providers"; "--fullpaths"; "--flaterrors" ] 
+            [ "fsc.exe"; "-o"; output; "-a"; sourceFile; "--noframework"; "--validate-type-providers"; "--fullpaths"; "--flaterrors"; "--debug:full" ] 
             @ generateReferences references
             |> List.toArray
                                
-        let fsi = getFsiSession()     
+        
         try       
             sbErr.Clear() |> ignore
             sbOut.Clear() |> ignore
-            fsi.EvalInteraction metaprogram                            
-            let expr = if String.IsNullOrWhiteSpace metaprogramParams then "generate()" else "generate " + metaprogramParams
+            // stage 1 - evaluate metaprogram with FSI session
+            let fsi, expr =
+                match metaprogram with
+                | File filePath -> 
+                    // for some reason, trying including the file with --use in the fsi session's arguments
+                    // simply does not work when hosted interactively - it just does nothing.  This is a bit
+                    // of a pain, instead we will have to load the script and then call generate via the 
+                    // implict module name that fsi creates, which is a title cased version of the filename
+                    let fsi = getFsiSession()
+                    fsi.EvalScript filePath
+                    let title = Path.GetFileNameWithoutExtension filePath
+                    let title = string(Char.ToUpper(title.[0])) + title.Substring(1)                    
+                    let expr = 
+                        if String.IsNullOrWhiteSpace metaprogramParams then 
+                            sprintf "%s.generate()" title
+                        else 
+                            sprintf "%s.generate %s" title metaprogramParams
+                    fsi, expr
+                | Text sourceCode -> 
+                    let fsi = getFsiSession()
+                    fsi.EvalInteraction sourceCode
+                    let expr = 
+                        if String.IsNullOrWhiteSpace metaprogramParams then 
+                            "generate()"
+                        else 
+                            sprintf "generate %s" metaprogramParams
+                    fsi, expr
+            
+            // stage 2 - attempt to generate code from metaprogram 
             match fsi.EvalExpression expr with
             | Some x -> 
+                // stage 2 - take resulting program and compile it with fsc
                 let source = x.ReflectionValue :?> string
                 let source, refs = preparedProgram source
                 File.WriteAllText(sourceFile, source)
@@ -194,14 +233,14 @@ type MixinCompiler() =
                 if code > 0 then Bad (Exception(String.Join("\n", errors))) else
                 let asm = Assembly.LoadFrom dllFile
                 if state.ContainsKey asmName then state.Remove asmName |> ignore
-                state.Add(asmName, {originalSource=metaprogram; assemblyLocation = dllFile; assembly = asm; metaprogramParams = metaprogramParams })
+                state.Add(asmName, {assemblyLocation = dllFile; assembly = asm; metaprogramParams = metaprogramParams })
                 Good asm
             | _ -> 
                 Bad (new Exception("metaprogram failed to evaluate the generate function:\n" + sbErr.ToString()))
         with
         | ex -> Bad (Exception("metaprogram failed to load:\n" + sbErr.ToString(), ex))
                                 
-    member this.Compile(metaprogram,moduleName,mode,outputLoc,metaprogramParams) =
+    member this.Compile(metaprogram,moduleName,mode,outputLoc,metaprogramParams,generationMode) =
         let asmName = sprintf "%s, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null" moduleName
         let current = FileInfo(Assembly.GetExecutingAssembly().Location).Directory
         let metaFileLoc = try Path.Combine(current.FullName,metaprogram) with _ -> ""
@@ -218,9 +257,9 @@ type MixinCompiler() =
             let dllFile = Path.ChangeExtension(name, ".dll")          
             fsFile,dllFile
         
-        let getSource() =
-            try if  (not (String.IsNullOrWhiteSpace metaFileLoc)) && File.Exists metaFileLoc then File.ReadAllText metaFileLoc else metaprogram
-            with _ -> metaprogram
+        let source =
+            try if  (not (String.IsNullOrWhiteSpace metaFileLoc)) && File.Exists metaFileLoc then File metaFileLoc else Text metaprogram
+            with _ -> Text metaprogram
          
         match mode with 
         | CompileMode.CompileWhenMissisng ->
@@ -228,27 +267,27 @@ type MixinCompiler() =
             else
                 if File.Exists dllFile then 
                     let asm = Assembly.LoadFrom dllFile
-                    state.Add(asmName, {originalSource=""; assemblyLocation = dllFile; assembly = asm;  metaprogramParams = metaprogramParams; })
+                    state.Add(asmName, {assemblyLocation = dllFile; assembly = asm;  metaprogramParams = metaprogramParams; })
                     asm
                 else 
-                    match internalCompile asmName moduleName metaprogram metaprogramParams fsFile dllFile with
+                    match internalCompile asmName moduleName source metaprogramParams fsFile dllFile generationMode with
                     | Good asm -> asm
                     | Bad ex -> raise ex
         | CompileMode.AlwaysCompile ->
-            let metaprogram = getSource()
-            match internalCompile asmName moduleName metaprogram metaprogramParams fsFile dllFile with
+            //let metaprogram = getSource()
+            match internalCompile asmName moduleName source metaprogramParams fsFile dllFile generationMode with
             | Good asm -> asm
             | Bad ex -> raise ex
-        | CompileMode.CompileWhenChanged -> 
-            let metaprogram = getSource()
-            match state.TryGetValue asmName with
-            | true, value when value.originalSource = metaprogram 
-                            && value.assemblyLocation = dllFile 
-                            && value.metaprogramParams = metaprogramParams ->
-                state.[asmName].assembly
-            | _ ->  match internalCompile asmName moduleName metaprogram metaprogramParams fsFile dllFile with
-                    | Good asm -> asm
-                    | Bad ex -> raise ex
+//        | CompileMode.CompileWhenChanged -> 
+//            //let metaprogram = getSource()
+//            match state.TryGetValue asmName with
+//            | true, value when value.originalSource = metaprogram 
+//                            && value.assemblyLocation = dllFile 
+//                            && value.metaprogramParams = metaprogramParams ->
+//                state.[asmName].assembly
+//            | _ ->  match internalCompile asmName moduleName metaprogram metaprogramParams fsFile dllFile with
+//                    | Good asm -> asm
+//                    | Bad ex -> raise ex
         
         | _ -> failwith "impossible"
         
