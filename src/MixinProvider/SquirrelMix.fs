@@ -9,7 +9,7 @@ module SquirrelMix =
     open System.Text
     type sb = StringBuilder
 
-    let mapPipe f = List.map f >> List.reduce (>>)
+    let mapPipe f = Seq.map f >> Seq.reduce (>>)
 
     /// appends count number of spaces
     let spaces count (sb:sb) = 
@@ -91,10 +91,10 @@ module SquirrelMix =
             match args with 
             | Partial args ->
                 let cp = function n, None -> n | n, Some t -> annoParamParens n t 
-                join " " (List.map cp args)
+                join " " (Seq.map cp args)
             | Tuple args -> 
                 let cp = function n, None -> n | n, Some t -> annoParam n t             
-                wrapParens (join ", " (List.map cp args))
+                wrapParens (join ", " (Seq.map cp args))
             | NoArgs ->"()" 
         indent indentLevel
         >> ap stat >> ap qualifier >> space >> ap mem >> ap ident >> ap "." >> ap name >> ap signature >> ap " = " >> newl
@@ -113,14 +113,14 @@ module SquirrelMix =
     let ctype name args inheritFrom members indentLevel =
         indent indentLevel
         >> ap "type " >> ap name 
-        >> ap(wrapParens (join "; " (List.map(fun (p,t) -> annoParam p t) args))) >> ap " =" >> newl
+        >> ap(wrapParens (join "; " (Seq.map(fun (p,t) -> annoParam p t) args))) >> ap " =" >> newl
         >> (if inheritFrom = "" then id else indent (indentLevel+1) >> ap "inherit " >> ap inheritFrom) >> newl
         >> cwithMembers members (indentLevel+1)
     
     let carray members indentLevel =
         indent indentLevel
         >> ap "[|" >> newl
-        >> (if List.isEmpty members then id else mapPipe(fun f -> f (indentLevel+1) >> ap ";" >> newl) members)
+        >> (if Seq.isEmpty members then id else mapPipe(fun f -> f (indentLevel+1) >> ap ";" >> newl) members)
         >> indent indentLevel >> ap "|]" >> newl
         
     ///creates a record type at indent level with the specified fields
@@ -128,23 +128,24 @@ module SquirrelMix =
     let crecord name fields members indentLevel =
         indent indentLevel 
         >> ap "type " >> ap name >> space >> ap " = "
-        >> ap(wrapBraces (join "; " (List.map(fun (p,t) -> annoParam p t) fields))) >> newl
+        >> ap(wrapBraces (join "; " (Seq.map(fun (p,t) -> annoParam p t) fields))) >> newl
         >> cwithMembers members indentLevel
 
     /// instantiates a record type in the format  { f = v; f2 = v2 }
     /// ignores indent level
-    let irecord = 
-        List.map(fun (f,v) -> sprintf "%s = %s; " f v) 
-        >> join ""
-        >> wrapBraces
-        >> ap
+    let irecord fields = 
+        fields
+        |> Seq.map(fun (f,v) -> sprintf "%s = %s; " f v) 
+        |> join ""
+        |> wrapBraces
+        |> ap
         
     /// creates a single union type case with any amount of type arguments
     /// that can optionally be named (F# 4)
     /// type args should be in the form (name,type name) where name can be blank
     let cunionTypeCase name args =
         sprintf "| %s of %s" name 
-            (join " * " (List.map(fun (identifier,typeName) ->
+            (join " * " (Seq.map(fun (identifier,typeName) ->
                                     if String.IsNullOrWhiteSpace identifier then typeName
                                     else sprintf "%s : %s" identifier typeName)
                                     args))
@@ -224,15 +225,15 @@ module SquirrelMix =
         let r loc = sprintf "#r @\"%s\"" loc
         let i loc = sprintf "#I @\"%s\"" loc
         ap "#if MIXIN  \r\n" 
-        >> ap (join "\r\n" (List.map i locations)) 
+        >> ap (join "\r\n" (Seq.map i locations)) 
         >> newl
-        >> ap (join "\r\n" (List.map r references)) 
+        >> ap (join "\r\n" (Seq.map r references)) 
         >> newl
         >> ap "#endif\r\n"
         
     let copen opens indentLevel =
         
-        ap (join "\r\n" (List.map (sprintf "open %s\r\n") opens)) >> newl
+        ap (join "\r\n" (Seq.map (sprintf "open %s\r\n") opens)) >> newl
 
 
     /// creates an if .. then .. else expression, the functions 

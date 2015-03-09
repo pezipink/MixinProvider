@@ -24,43 +24,61 @@ open Microsoft.FSharp.Compiler.Interactive.Shell
 open Microsoft.FSharp.Compiler.SimpleSourceCodeServices
 open Microsoft.FSharp.Compiler.SourceCodeServices
 
+// create a mini-mixin type provider consiting of a static parameter for each 
+// argument that the corresponding metaprogram's generate function accepts
 let ctypeprovider (fileName:string, args)  =
     let name = fileName.Replace(".fsx","").Substring(fileName.LastIndexOf("\\")+1)
     let tname = sprintf "%s_mixin" name
+    // ignore any Unit args
     let args = args  |> List.filter(fun (_,ft:FSharpType) -> 
         if ft.ToString() = "type Microsoft.FSharp.Core.unit" then false
         else true )
 
-    let paramCreation =
-        List.append 
-            (args |> List.map(fun (name, ftype) -> 
+    // create static parameters
+    let paramCreation = seq {
+        // use the helper funcions to create a paramete defintions for each argument
+        yield! args |> Seq.map(
+            fun (name, ftype) -> 
                 match ftype.AbbreviatedType.TypeDefinition.QualifiedName with
                 | "System.Int32" -> api (sprintf "helpers.intParameter \"%s\" None" name)
                 | "System.String" -> api (sprintf "helpers.stringParameter \"%s\" None" name)
-                | t -> failwithf "type %s is not supported in a mini-mixin" t))
-            [api ("helpers.genericOptionalParameter \"compileMode\" CompileMode.CompileWhenMissisng")
-             api ("helpers.genericOptionalParameter \"generationMode\" GenerationMode.AutoOpenModule")
-             api ("helpers.stringParameter \"outputLocation\" (Some \"\")") ]
-        
-    let paramExtraction = 
-        List.append 
-            (args 
-                |> List.mapi(fun i (name, ftype) -> 
+                | t -> failwithf "type %s is not supported in a mini-mixin" t) 
+
+        // these three go on all mini-mixins
+        yield api ("helpers.genericOptionalParameter \"compileMode\" CompileMode.CompileWhenMissisng")
+        yield api ("helpers.genericOptionalParameter \"generationMode\" GenerationMode.AutoOpenModule")
+        yield api ("helpers.stringParameter \"outputLocation\" (Some \"\")") } 
+    
+    
+    // let-bind each expected static parameter (used in ApplyStaticArgs(..))
+    let paramExtraction = seq {
+        // expect the generated arguments to be first
+        yield! args |> Seq.mapi(
+            fun i (name, ftype) -> 
                 match ftype.AbbreviatedType.TypeDefinition.QualifiedName with
                 | "System.Int32" -> clet name (ap (sprintf "staticArguments.[%i] :?> int" i))
                 | "System.String" -> clet name (ap (sprintf "staticArguments.[%i] :?> string" i))
-                | t -> failwithf "type %s is not supported in a mini-mixin" t))
-            [clet "compileMode" (ap (sprintf "staticArguments.[%i] :?> CompileMode" args.Length))
-             clet "generationMode" (ap (sprintf "staticArguments.[%i] :?> GenerationMode" (args.Length+1)))
-             clet "outputLoc"   (ap (sprintf "staticArguments.[%i] :?> string" (args.Length+2)))]
-        
+                | t -> failwithf "type %s is not supported in a mini-mixin" t)
+
+        // and these three are offset from the amount of generated arguments
+        yield clet "compileMode" (ap (sprintf "staticArguments.[%i] :?> CompileMode" args.Length))
+        yield clet "generationMode" (ap (sprintf "staticArguments.[%i] :?> GenerationMode" (args.Length+1)))
+        yield clet "outputLoc"   (ap (sprintf "staticArguments.[%i] :?> string" (args.Length+2))) } 
+
+    // define the arguments that are passed to the metaprogram as a string
+    // here we simply join the arguments together using String.Join " "
     let mprams =
         match args with
-        | [] -> clet "mparams" (ap "\"\"")
-        | args -> clet "mparams" (ap (sprintf "String.Join(\" \", [|%s|])" (String.Join("; ", args |> List.map(fun (n,_) -> n)))))
-            
+        | [] -> clet "mparams" (ap "\"\"") // no args, blank string
+        | args -> clet "mparams" 
+                    (ap (sprintf "String.Join(\" \", [|%s|])" 
+                        (String.Join("; ", args |> List.map(fun (n,_) -> n))))) // yes I know this looks like LISP
+    
+    // a type provider compositite code block consists of:      
     ccode [
+        // a dummy type that is the name you use as the type provider
         ctype tname [] "obj()" []
+        // now the type provider itself
         api ("[<TypeProvider>]")
         ctype (sprintf "%sProvider" name) [] "MixinProvider()"
             [
@@ -74,12 +92,11 @@ let ctypeprovider (fileName:string, args)  =
                     (Tuple ["typeWithoutArguments", Some "Type"; 
                             "typePathWithArguments", Some "string []";
                             "staticArguments", Some"obj []";]) 
-                    (ccode 
-                        (List.append
-                        paramExtraction
-                        [clet "moduleName" (ap "typePathWithArguments.[typePathWithArguments.Length-1]")
-                         mprams
-                         api (sprintf "this.ExecuteMixinCompile(typeWithoutArguments, typePathWithArguments, \"%s\", moduleName, compileMode, outputLoc, mparams, generationMode)" fileName)]))
+                    (ccode <| seq {
+                        yield! paramExtraction
+                        yield clet "moduleName" (ap "typePathWithArguments.[typePathWithArguments.Length-1]")
+                        yield mprams
+                        yield api (sprintf "this.ExecuteMixinCompile(typeWithoutArguments, typePathWithArguments, \"%s\", moduleName, compileMode, outputLoc, mparams, generationMode)" fileName)})
                 cmember (InstanceOverride "this") "" "GetNamespace" NoArgs (api "\"MiniMixins\"")
             ]
     ]
@@ -132,10 +149,9 @@ let generate metaprogramPath =
     let typeProviders = metaprogramInfo |> Array.map ctypeprovider |> Array.toList
 
     (1,StringBuilder())
-    ||> ccode 
-        ([copen ["Microsoft.FSharp.Core.CompilerServices";"MixinProvider";"MixinCompiler";"System"]
-          (genReferences [] ["MixinProvider.dll"])
-            ] 
-         @ typeProviders
-         @ [fun i -> ap "[<assembly:TypeProviderAssembly>] do ()"])
+    ||> ccode ( seq {
+         yield  copen ["Microsoft.FSharp.Core.CompilerServices";"MixinProvider";"MixinCompiler";"System"]
+         yield  genReferences [] ["MixinProvider.dll"]
+         yield! typeProviders
+         yield fun i -> ap "[<assembly:TypeProviderAssembly>] do ()"} )
     |> function sb -> sb.ToString()
