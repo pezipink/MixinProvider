@@ -110,9 +110,7 @@ type MixinCompiler() =
         "Facades" ++ "System.Runtime.Serialization.Primitives.dll"
         "Facades" ++ "System.Runtime.Serialization.Xml.dll"
         "Facades" ++ "System.Security.Principal.dll"
-        "Facades" ++ "System.ServiceModel.Duplex.dll"
         "Facades" ++ "System.ServiceModel.Http.dll"
-        "Facades" ++ "System.ServiceModel.NetTcp.dll"
         "Facades" ++ "System.ServiceModel.Primitives.dll"
         "Facades" ++ "System.ServiceModel.Security.dll"
         "Facades" ++ "System.Text.Encoding.dll"
@@ -126,11 +124,19 @@ type MixinCompiler() =
         "Facades" ++ "System.Xml.XDocument.dll"
         "Facades" ++ "System.Xml.XmlSerializer.dll"]
 
+    let nonMonoReferenceAssemblies = [
+        "Facades" ++ "System.ServiceModel.Duplex.dll"
+        "Facades" ++ "System.ServiceModel.NetTcp.dll"]
+
     let defaultReferences =
         seq { yield fsharpCoreLocation
               yield! defaultReferenceAssemblies 
                      |> List.map(fun l ->                     
-                            (Path.Combine(frameworkReferenceLocation,l))) }    
+                            (Path.Combine(frameworkReferenceLocation,l)))
+              if not isMono then
+                    yield! nonMonoReferenceAssemblies
+                           |> List.map(fun l ->
+                                (Path.Combine(frameworkReferenceLocation,l)))}    
         |> Seq.toList
 
     let sbOut = new StringBuilder()
