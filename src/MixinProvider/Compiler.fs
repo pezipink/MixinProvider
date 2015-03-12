@@ -51,74 +51,92 @@ type GenerationMode =
 type SourceType =
     | File of string
     | Text of string
+
+let isMono = Type.GetType("Mono.Runtime") <> null
     
 type MixinCompiler() =
-    // TODO : Mono support
-    let pf = System.Environment.ExpandEnvironmentVariables("%programfiles%")
-    let frameworkReferenceLocation = Path.Combine(pf,@"Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.1")
-    let fsharpCoreLocation = Path.Combine(pf, @"Reference Assemblies\Microsoft\FSharp\.NETFramework\v4.0\4.3.1.0\FSharp.Core.dll")
+    let (++) path1 path2 = Path.Combine(path1, path2)
+    // In Mono all the files we need are actually in one place
+    // but in .NET the FSharp.Core.dll is in another castle
+    let frameworkReferenceLocation,fsharpCoreLocation =
+        if isMono then
+            let frameworkReferenceLocation = System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory()
+            let fsharpCoreLocation = frameworkReferenceLocation ++ "FSharp.Core.dll"
+            frameworkReferenceLocation, fsharpCoreLocation
+        else
+            let pf = System.Environment.ExpandEnvironmentVariables("%programfiles%")
+            let frameworkReferenceLocation = pf ++ @"Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.1"
+            let fsharpCoreLocation = pf ++ @"Reference Assemblies\Microsoft\FSharp\.NETFramework\v4.0\4.3.1.0\FSharp.Core.dll"
+            frameworkReferenceLocation, fsharpCoreLocation
+
     let defaultReferenceAssemblies = [
-        @"mscorlib.dll"
-        @"System.Core.dll"
-        @"System.dll"
-        @"System.Numerics.dll"
-        @"Facades\System.Collections.Concurrent.dll"
-        @"Facades\System.Collections.dll"
-        @"Facades\System.ComponentModel.Annotations.dll"
-        @"Facades\System.ComponentModel.dll"
-        @"Facades\System.ComponentModel.EventBasedAsync.dll"
-        @"Facades\System.Diagnostics.Contracts.dll"
-        @"Facades\System.Diagnostics.Debug.dll"
-        @"Facades\System.Diagnostics.Tools.dll"
-        @"Facades\System.Diagnostics.Tracing.dll"
-        @"Facades\System.Dynamic.Runtime.dll"
-        @"Facades\System.Globalization.dll"
-        @"Facades\System.IO.dll"
-        @"Facades\System.Linq.dll"
-        @"Facades\System.Linq.Expressions.dll"
-        @"Facades\System.Linq.Parallel.dll"
-        @"Facades\System.Linq.Queryable.dll"
-        @"Facades\System.Net.NetworkInformation.dll"
-        @"Facades\System.Net.Primitives.dll"
-        @"Facades\System.Net.Requests.dll"
-        @"Facades\System.ObjectModel.dll"
-        @"Facades\System.Reflection.dll"
-        @"Facades\System.Reflection.Emit.dll"
-        @"Facades\System.Reflection.Emit.ILGeneration.dll"
-        @"Facades\System.Reflection.Emit.Lightweight.dll"
-        @"Facades\System.Reflection.Extensions.dll"
-        @"Facades\System.Reflection.Primitives.dll"
-        @"Facades\System.Resources.ResourceManager.dll"
-        @"Facades\System.Runtime.dll"
-        @"Facades\System.Runtime.Extensions.dll"
-        @"Facades\System.Runtime.InteropServices.dll"
-        @"Facades\System.Runtime.InteropServices.WindowsRuntime.dll"
-        @"Facades\System.Runtime.Numerics.dll"
-        @"Facades\System.Runtime.Serialization.Json.dll"
-        @"Facades\System.Runtime.Serialization.Primitives.dll"
-        @"Facades\System.Runtime.Serialization.Xml.dll"
-        @"Facades\System.Security.Principal.dll"
-        @"Facades\System.ServiceModel.Duplex.dll"
-        @"Facades\System.ServiceModel.Http.dll"
-        @"Facades\System.ServiceModel.NetTcp.dll"
-        @"Facades\System.ServiceModel.Primitives.dll"
-        @"Facades\System.ServiceModel.Security.dll"
-        @"Facades\System.Text.Encoding.dll"
-        @"Facades\System.Text.Encoding.Extensions.dll"
-        @"Facades\System.Text.RegularExpressions.dll"
-        @"Facades\System.Threading.dll"
-        @"Facades\System.Threading.Tasks.dll"
-        @"Facades\System.Threading.Tasks.Parallel.dll"
-        @"Facades\System.Threading.Timer.dll"
-        @"Facades\System.Xml.ReaderWriter.dll"
-        @"Facades\System.Xml.XDocument.dll"
-        @"Facades\System.Xml.XmlSerializer.dll"]
+        "mscorlib.dll"
+        "System.Core.dll"
+        "System.dll"
+        "System.Numerics.dll"
+        "Facades" ++ "System.Collections.Concurrent.dll"
+        "Facades" ++ "System.Collections.dll"
+        "Facades" ++ "System.ComponentModel.Annotations.dll"
+        "Facades" ++ "System.ComponentModel.dll"
+        "Facades" ++ "System.ComponentModel.EventBasedAsync.dll"
+        "Facades" ++ "System.Diagnostics.Contracts.dll"
+        "Facades" ++ "System.Diagnostics.Debug.dll"
+        "Facades" ++ "System.Diagnostics.Tools.dll"
+        "Facades" ++ "System.Diagnostics.Tracing.dll"
+        "Facades" ++ "System.Dynamic.Runtime.dll"
+        "Facades" ++ "System.Globalization.dll"
+        "Facades" ++ "System.IO.dll"
+        "Facades" ++ "System.Linq.dll"
+        "Facades" ++ "System.Linq.Expressions.dll"
+        "Facades" ++ "System.Linq.Parallel.dll"
+        "Facades" ++ "System.Linq.Queryable.dll"
+        "Facades" ++ "System.Net.NetworkInformation.dll"
+        "Facades" ++ "System.Net.Primitives.dll"
+        "Facades" ++ "System.Net.Requests.dll"
+        "Facades" ++ "System.ObjectModel.dll"
+        "Facades" ++ "System.Reflection.dll"
+        "Facades" ++ "System.Reflection.Emit.dll"
+        "Facades" ++ "System.Reflection.Emit.ILGeneration.dll"
+        "Facades" ++ "System.Reflection.Emit.Lightweight.dll"
+        "Facades" ++ "System.Reflection.Extensions.dll"
+        "Facades" ++ "System.Reflection.Primitives.dll"
+        "Facades" ++ "System.Resources.ResourceManager.dll"
+        "Facades" ++ "System.Runtime.dll"
+        "Facades" ++ "System.Runtime.Extensions.dll"
+        "Facades" ++ "System.Runtime.InteropServices.dll"
+        "Facades" ++ "System.Runtime.InteropServices.WindowsRuntime.dll"
+        "Facades" ++ "System.Runtime.Numerics.dll"
+        "Facades" ++ "System.Runtime.Serialization.Json.dll"
+        "Facades" ++ "System.Runtime.Serialization.Primitives.dll"
+        "Facades" ++ "System.Runtime.Serialization.Xml.dll"
+        "Facades" ++ "System.Security.Principal.dll"
+        "Facades" ++ "System.ServiceModel.Http.dll"
+        "Facades" ++ "System.ServiceModel.Primitives.dll"
+        "Facades" ++ "System.ServiceModel.Security.dll"
+        "Facades" ++ "System.Text.Encoding.dll"
+        "Facades" ++ "System.Text.Encoding.Extensions.dll"
+        "Facades" ++ "System.Text.RegularExpressions.dll"
+        "Facades" ++ "System.Threading.dll"
+        "Facades" ++ "System.Threading.Tasks.dll"
+        "Facades" ++ "System.Threading.Tasks.Parallel.dll"
+        "Facades" ++ "System.Threading.Timer.dll"
+        "Facades" ++ "System.Xml.ReaderWriter.dll"
+        "Facades" ++ "System.Xml.XDocument.dll"
+        "Facades" ++ "System.Xml.XmlSerializer.dll"]
+
+    let nonMonoReferenceAssemblies = [
+        "Facades" ++ "System.ServiceModel.Duplex.dll"
+        "Facades" ++ "System.ServiceModel.NetTcp.dll"]
 
     let defaultReferences =
         seq { yield fsharpCoreLocation
               yield! defaultReferenceAssemblies 
                      |> List.map(fun l ->                     
-                            (Path.Combine(frameworkReferenceLocation,l))) }    
+                            (Path.Combine(frameworkReferenceLocation,l)))
+              if not isMono then
+                    yield! nonMonoReferenceAssemblies
+                           |> List.map(fun l ->
+                                (Path.Combine(frameworkReferenceLocation,l)))}    
         |> Seq.toList
 
     let sbOut = new StringBuilder()
