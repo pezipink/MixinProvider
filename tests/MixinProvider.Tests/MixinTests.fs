@@ -8,11 +8,11 @@ open System.Diagnostics
 
 open MixinProvider
 
-//type MiniMixins = mixin_gen< "TestMetaprograms\\MiniMixins.fsx", metaprogramParameters = "@\"F:\GIT\MixinProvider\src\MixinProvider\TestMetaprograms\"", generationMode = MixinCompiler.GenerationMode.Namespace >
+//type MiniMixins = mixin_gen< "TestMetaprograms\\MiniMixins.fsx", metaprogramParameters = "@\"C:\Users\Ross\Documents\MixinProvider\src\MixinProvider\TestMetaprograms\"", generationMode = MixinCompiler.GenerationMode.Namespace >
 
 
 
-type FirstTest = mixin_gen< """let generate() = "let x = 42" """ >
+type FirstTest = mixin_gen< """let generate() = "[<Literal>]let x = 42" """ , compileMode=MixinCompiler.CompileMode.CompileWhenMissisng>
 
 // generates a x = 42
 type Basic_Test = mixin_gen< "TestMetaprograms/basic.fsx", outputLocation = @"../bin/" >
@@ -26,8 +26,10 @@ type Basic_Test = mixin_gen< "TestMetaprograms/basic.fsx", outputLocation = @"..
 
 // generates a x = 25  (5 + 20!)
 type Test_Params = mixin_gen< "TestMetaprograms/basic_params.fsx", metaprogramParameters = "5 20" >
-
-
-type ConnectionString_Test = mixin_gen<"TestMetaprograms/connectionstring.fsx", metaprogramParameters = "\"John\"" >
+//
+//
+//type ConnectionString_Test = mixin_gen<"TestMetaprograms/connectionstring.fsx", metaprogramParameters = "\"Phil\"" >
+//
+//ConnectionString_Test.
 
 //type Excel_Test = mixin_gen< "TestMetaprograms\\excel.fsx" >

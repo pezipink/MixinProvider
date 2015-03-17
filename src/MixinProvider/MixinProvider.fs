@@ -74,10 +74,10 @@ type MixinProvider() =
     default x.AvailableTypes() = [| typeof<mixin_gen> |]
             
 //    abstract member ExecuteMixinCompile : Type * string array * string * string * MixinCompiler.CompileMode * string * string -> Type 
-    member x.ExecuteMixinCompile(typeWithoutArguments,typePathWithArguments:string[],metaprogram,moduleName,compileMode,outputLoc,mpParams,generationMode) = 
+    member x.ExecuteMixinCompile(typeWithoutArguments,typePathWithArguments:string[],metaprogram,wrapperType,compileMode,outputLoc,mpParams,evaluation,compilation) = 
         lock mix (fun _ -> 
             try
-                let asm = mix.Compile(metaprogram,moduleName,compileMode,outputLoc,mpParams,generationMode) 
+                let asm = mix.Compile(metaprogram,wrapperType,compileMode,outputLoc,mpParams,evaluation,compilation) 
                 if x.AvailableTypes() |> Array.exists((=) typeWithoutArguments) then
                     asm.GetType(typePathWithArguments.[typePathWithArguments.Length-1])
                 else asm.GetType(typeWithoutArguments.FullName)
@@ -92,7 +92,13 @@ type MixinProvider() =
         let outputLoc = staticArguments.[4] :?>  string
         let moduleName = typePathWithArguments.[typePathWithArguments.Length-1]
         let metaprogram = resolveMetaprogram(staticArguments.[0] :?> string)
-        x.ExecuteMixinCompile(typeWithoutArguments, typePathWithArguments, metaprogram, moduleName, compileMode, outputLoc, mpParams,generationMode)
+        let wrapperType =
+            match generationMode with
+            | GenerationMode.Module -> WrapperType.Module moduleName
+            | GenerationMode.AutoOpenModule -> WrapperType.AutoOpenModule moduleName
+            | GenerationMode.Namespace -> WrapperType.Namespace moduleName
+            | _ -> failwith "impossible"
+        x.ExecuteMixinCompile(typeWithoutArguments, typePathWithArguments, metaprogram, wrapperType, compileMode, outputLoc, mpParams,MixinCompiler.evaluateWithFsi,MixinCompiler.fscCompile)
  
     abstract member StaticParameters : unit -> ParameterInfo array
     default x.StaticParameters() =
