@@ -50,14 +50,7 @@ module helpers =
         override this.RawDefaultValue with get() = def
         override this.DefaultValue with get() =  def
         override this.Attributes with get() = ParameterAttributes.Optional }
-
-type mixin_gen() = inherit obj()
-
-[<TypeProvider>]
-type MixinProvider() =
-    static let mix = new MixinCompiler()
-    let invalidation = new Event<EventHandler, EventArgs>()
-
+    
     let resolveMetaprogram(metaprogram) =
          let fi = FileInfo(Assembly.GetExecutingAssembly().Location)
          try
@@ -66,6 +59,13 @@ type MixinProvider() =
              if File.Exists fn then fn
              else metaprogram
          with _ -> metaprogram
+
+type mixin_gen() = inherit obj()
+
+[<TypeProvider>]
+type MixinProvider() =
+    static let mix = new MixinCompiler()
+    let invalidation = new Event<EventHandler, EventArgs>()
 
     abstract member ResolveType : string -> Type
     default x.ResolveType(typeName) = typeof<mixin_gen>
@@ -91,7 +91,7 @@ type MixinProvider() =
         let generationMode = staticArguments.[3] :?>  GenerationMode
         let outputLoc = staticArguments.[4] :?>  string
         let moduleName = typePathWithArguments.[typePathWithArguments.Length-1]
-        let metaprogram = resolveMetaprogram(staticArguments.[0] :?> string)
+        let metaprogram = helpers.resolveMetaprogram(staticArguments.[0] :?> string)
         let wrapperType =
             match generationMode with
             | GenerationMode.Module -> WrapperType.Module moduleName
