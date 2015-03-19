@@ -27,12 +27,16 @@ This usage mode is really no different from lite, it is only logistical; Think o
 Referenced assemblies of course suffer from no limitations at all.  Using the code generation DSL, a quotation compiler, or some other method of your choosing, you can now generate any and all F# code including Record Types, Discriminated Unions, Extension Methods, Generics, Computation Expressions and even other type providers
 
 ### Mixin Inject
-This mode allows you to inject F# code into another project by using #IF MIXIN markers and calling a dummy function.  At compile time the Mixin provider will directly inject code generated via the metapgoram into those locations.  (WORK IN PROGRESS, NOT YET SUPPORTED!)
+This mode allows you to inject F# code into another project by  calling dummy injection functions.  At compile time the Mixin provider will scan for F# projects, find locations where injection functions are used, call the equivalent functions in the metaprogram and directly inject the resulting code into those locations at the correct indentation level.  (WORK IN PROGRESS, NOT YET SUPPORTED!)
 
 ### Metaprograms
 A metaprogram is any .fsx file or equivalent string.  You can do anything and everything you want in your metaprogram. For Lite and Full modes, the only rule is that you have one root level function called "generate" that should return the program to compile. This function may accept parameters which you are able to supply via the type procider's static parameters
 
 In the case of injection mode, your metaprogram should have an implementation for each dummy injection function you use in the target F# projects.
+
+### SquirrelMix
+"A cement for woodland creatures" ™
+SquirrelMix is a heavily compositional domain-specfic langauge for generating F# code in an idiomatic way.  The library of functions can create most common F# code and will automatically take care of troublesome problems such as ensuring the correct identation level for the code.
 
 ###Other features
 
