@@ -36,6 +36,7 @@ In the case of injection mode, your metaprogram should have an implementation fo
 
 ### SquirrelMix
 "A cement for woodland creatures" ™
+
 SquirrelMix is a heavily compositional domain-specfic langauge for generating F# code in an idiomatic way.  The library of functions can create most common F# code and will automatically take care of troublesome problems such as ensuring the correct identation level for the code.
 
 ###Other features
