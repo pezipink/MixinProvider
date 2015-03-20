@@ -8,24 +8,34 @@ open System.IO
 open Microsoft.FSharp.Compiler.SourceCodeServices
 open Microsoft.FSharp.Compiler.SimpleSourceCodeServices
 open Microsoft.FSharp.Quotations
+open MixinProvider
 open MixinCompiler
 
 type mixin_inject() = inherit obj()
 
-// dummy inject functions
+// dummy inject functions and attributes
 [<AutoOpen>]
 module Injection =
-    let mixin_inject1 a = ()
-    let mixin_inject2 a b = ()
-    let mixin_inject3 a b c = ()
-    let mixin_inject4 a b c d = ()
-    let mixin_inject5 a b c d e = ()
+    let mixin_inject injected = ()
+    let mixin_inject1 a injected = ()
+    let mixin_inject2 a b injected = ()
+    let mixin_inject3 a b c injected = ()
+    let mixin_inject4 a b c d injected = ()
+    let mixin_inject5 a b c d e injected = ()
+
+    type mixin_injectAttribute(injected) = inherit Attribute()
+    type mixin_inject1Attribute(a,injected) = inherit Attribute()
+    type mixin_inject2Attribute(a,b,injected) = inherit Attribute()
+    type mixin_inject3Attribute(a,b,c,injected) = inherit Attribute()
+    type mixin_inject4Attribute(a,b,c,d,injected) = inherit Attribute()
+    type mixin_inject5Attribute(a,b,c,d,e,injected) = inherit Attribute()
 
 type ProjectSeekMode =
     | Absolute = 1
     | Scan = 2
     | RecursiveScan = 3
 
+[<TypeProvider>]
 type MixinInjectionProvider() =
     inherit MixinProvider()
     let checkProject projectFile = 
@@ -44,12 +54,17 @@ type MixinInjectionProvider() =
                 yield dec
             }
 
-        let injectionFunctions =
+        let injectionNames =
             ["mixin_inject1"
-                "mixin_inject2"
-                "mixin_inject3"
-                "mixin_inject4"
-                "mixin_inject5"]
+             "mixin_inject2"
+             "mixin_inject3"
+             "mixin_inject4"
+             "mixin_inject5"
+             "mixin_inject1Attribute"
+             "mixin_inject2Attribute"
+             "mixin_inject3Attribute"
+             "mixin_inject4Attribute"
+             "mixin_inject5Attribute"]
 
         results.AssemblyContents.ImplementationFiles.[0].Declarations
         |> Seq.map declarations
@@ -57,7 +72,7 @@ type MixinInjectionProvider() =
         |> Seq.tryPick(
             function 
             | FSharpImplementationFileDeclaration.MemberOrFunctionOrValue(v,vs,e) 
-                when List.exists((=)v.DisplayName) injectionFunctions ->
+                when List.exists((=)v.DisplayName) injectionNames ->
                 Some (v.DisplayName, vs |> List.collect id |> List.map (fun e -> e.DisplayName,e.FullType))
             | _ -> None)
         |> function
@@ -73,7 +88,7 @@ type MixinInjectionProvider() =
     let projectScan mode param = 
         match mode with
         | ProjectSeekMode.Absolute ->
-            if File.Exists param = false then failwith "could not locate specified F# projedct file"
+            if File.Exists param = false then failwith "could not locate specified F# project file"
             else [param]
         | ProjectSeekMode.Scan -> 
             if Directory.Exists param = false then failwith "the specified directory could not be found"
@@ -104,12 +119,8 @@ type MixinInjectionProvider() =
         //      to the equivalent in the metaprogram, and inject the 
         //      resulting code to that location in the file 
         // 4. what could possibly go wrong
-        ()
+        EvaluationSuccessful("let result = \"injection process completed succdessfully\"")
 
-    let injectCompile env _ = 
-        // compilation is largely ignored; we just create a dummy module
-        // that will satisfy the type provider infrastructure. yes, this is pure abuse.
-        ()
 
     override this.AvailableTypes() = [| typeof<mixin_inject> |]
 
@@ -125,6 +136,8 @@ type MixinInjectionProvider() =
     override this.ApplyStaticArgs(typeWithoutArguments: Type, typePathWithArguments: string [], staticArguments: obj []): Type = 
         let moduleName = typePathWithArguments.[typePathWithArguments.Length-1]
         let metaprogram = helpers.resolveMetaprogram(staticArguments.[0] :?> string)
+        let seekMode = staticArguments.[0] :?> ProjectSeekMode
+        let seekPath = staticArguments.[0] :?> string
         let wrapperType = WrapperType.Module moduleName
         this.ExecuteMixinCompile(
             typeWithoutArguments, 
@@ -134,6 +147,11 @@ type MixinInjectionProvider() =
             CompileMode.AlwaysCompile, 
             "", 
             "",
-            MixinCompiler.evaluateWithFsi,
+            injectMetaprogram,
             MixinCompiler.fscCompile)
 
+
+[<assembly:TypeProviderAssembly>]
+do  
+    
+    ()
