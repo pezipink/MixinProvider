@@ -68,7 +68,7 @@ type WrapperType =
         | AutoOpenModule s
         | Namespace s -> s
 
-type Environment = {
+type Environment<'a> = {
     /// name and type of the wrapper module or namespace
     /// this will be the type alias the user created the TP with
     wrapperType : WrapperType
@@ -80,6 +80,8 @@ type Environment = {
     sourceFile : string
     /// dll flie where the compiled program is written to
     dllFile : string
+    /// some other data as defined by a mixin extension
+    additionalData : 'a
 }
 
 let isMono = Type.GetType("Mono.Runtime") <> null
@@ -293,7 +295,7 @@ type MixinCompiler() =
         | EvaluationFailed ex -> raise ex
 
                                 
-    member this.Compile(metaprogram,wrapperType:WrapperType,mode,outputLoc,metaprogramParams,evaluation,compilation) =        
+    member this.Compile(metaprogram,wrapperType:WrapperType,mode,outputLoc,metaprogramParams,evaluation,compilation,additionalEnvironmentData) =        
         let asmName = sprintf "%s, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null" wrapperType.ModuleName
         let current = FileInfo(Assembly.GetExecutingAssembly().Location).Directory
         let metaFileLoc = try Path.Combine(current.FullName,metaprogram) with _ -> ""
@@ -320,7 +322,8 @@ type MixinCompiler() =
             metaprogram = source
             metaprogramParams = metaprogramParams
             sourceFile = fsFile
-            dllFile = dllFile }
+            dllFile = dllFile
+            additionalData = additionalEnvironmentData }
 
         match mode with 
         | CompileMode.CompileWhenMissisng ->

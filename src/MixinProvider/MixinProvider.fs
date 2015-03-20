@@ -74,10 +74,10 @@ type MixinProvider() =
     default x.AvailableTypes() = [| typeof<mixin_gen> |]
             
 //    abstract member ExecuteMixinCompile : Type * string array * string * string * MixinCompiler.CompileMode * string * string -> Type 
-    member x.ExecuteMixinCompile(typeWithoutArguments,typePathWithArguments:string[],metaprogram,wrapperType,compileMode,outputLoc,mpParams,evaluation,compilation) = 
+    member x.ExecuteMixinCompile(typeWithoutArguments,typePathWithArguments:string[],metaprogram,wrapperType,compileMode,outputLoc,mpParams,evaluation,compilation,additionalEnvironmentData) = 
         lock mix (fun _ -> 
             try
-                let asm = mix.Compile(metaprogram,wrapperType,compileMode,outputLoc,mpParams,evaluation,compilation) 
+                let asm = mix.Compile(metaprogram,wrapperType,compileMode,outputLoc,mpParams,evaluation,compilation,additionalEnvironmentData) 
                 if x.AvailableTypes() |> Array.exists((=) typeWithoutArguments) then
                     asm.GetType(typePathWithArguments.[typePathWithArguments.Length-1])
                 else asm.GetType(typeWithoutArguments.FullName)
@@ -98,7 +98,7 @@ type MixinProvider() =
             | GenerationMode.AutoOpenModule -> WrapperType.AutoOpenModule moduleName
             | GenerationMode.Namespace -> WrapperType.Namespace moduleName
             | _ -> failwith "impossible"
-        x.ExecuteMixinCompile(typeWithoutArguments, typePathWithArguments, metaprogram, wrapperType, compileMode, outputLoc, mpParams,MixinCompiler.evaluateWithFsi,MixinCompiler.fscCompile)
+        x.ExecuteMixinCompile(typeWithoutArguments, typePathWithArguments, metaprogram, wrapperType, compileMode, outputLoc, mpParams,MixinCompiler.evaluateWithFsi,MixinCompiler.fscCompile, None)
  
     abstract member StaticParameters : unit -> ParameterInfo array
     default x.StaticParameters() =
