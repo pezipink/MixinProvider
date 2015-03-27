@@ -16,22 +16,22 @@ open Microsoft.FSharp.Compiler.Interactive.Shell
 type mixin_inject() = inherit obj()
 
 // dummy inject functions and attributes
-[<AutoOpen>]
+
 module Injection =
-    let mixin_inject (injected:bool) = ()
-    let mixin_inject1 a (injected:bool) = ()
-    let mixin_inject2 a b (injected:bool) = ()
-    let mixin_inject3 a b c (injected:bool) = ()
-    let mixin_inject4 a b c d (injected:bool) = ()
-    let mixin_inject5 a b c d e (injected:bool) = ()
+    let mixin_inject (source:string) = ()
+    let mixin_inject1 a (source:string) = ()
+    let mixin_inject2 a b (source:string) = ()
+    let mixin_inject3 a b c (source:string) = ()
+    let mixin_inject4 a b c d (source:string) = ()
+    let mixin_inject5 a b c d e (source:string) = ()
     let mixin_inject_end() = ()
 
-    type mixin_injectAttribute(injected:bool) = inherit Attribute()
-    type mixin_inject1Attribute(a,injected:bool) = inherit Attribute()
-    type mixin_inject2Attribute(a,b,injected:bool) = inherit Attribute()
-    type mixin_inject3Attribute(a,b,c,injected:bool) = inherit Attribute()
-    type mixin_inject4Attribute(a,b,c,d,injected:bool) = inherit Attribute()
-    type mixin_inject5Attribute(a,b,c,d,e,injected:bool) = inherit Attribute()
+    type mixin_injectAttribute(source:string) = inherit Attribute()
+    type mixin_inject1Attribute(a,source:string) = inherit Attribute()
+    type mixin_inject2Attribute(a,b,source:string) = inherit Attribute()
+    type mixin_inject3Attribute(a,b,c,source:string) = inherit Attribute()
+    type mixin_inject4Attribute(a,b,c,d,source:string) = inherit Attribute()
+    type mixin_inject5Attribute(a,b,c,d,e,source:string) = inherit Attribute()
     type mixin_inject_endAttribute() = inherit Attribute()
 
 type ProjectSeekMode =
@@ -109,9 +109,9 @@ type MixinInjectionProvider() =
                 |> List.fold(fun (lastIndex,acc) (start, finish) ->
                     let expr = 
                         if prefix <> "" then
-                             sprintf "%s.%s" prefix (lines.[start.RangeAlternate.StartLine-1].Substring(lines.[start.RangeAlternate.StartLine-1].IndexOf("=")+1))                                
+                             sprintf "%s.%s %s" prefix ((lines.[start.RangeAlternate.StartLine-1].Substring(lines.[start.RangeAlternate.StartLine-1].IndexOf("=")+1)).Trim()) (sprintf "@\"%s\"" projectFile)
                         else
-                             sprintf "%s" (lines.[start.RangeAlternate.StartLine-1].Substring(lines.[start.RangeAlternate.StartLine-1].IndexOf("=")+1))
+                             sprintf "%s %s" (lines.[start.RangeAlternate.StartLine-1].Substring(lines.[start.RangeAlternate.StartLine-1].IndexOf("=")+1)) (sprintf "@\"%s\"" projectFile)
                     let program = 
                         match fsi.EvalExpression(expr) with 
                         | Some x -> 
@@ -129,7 +129,7 @@ type MixinInjectionProvider() =
         let projOptions = checker.GetProjectOptionsFromProjectFile projFile 
         match projectsCompiling.TryAdd(projFile,projOptions) with
         | true -> 
-            File.AppendAllText("I:\\mixin.log", sprintf "%s: checking project... \n" (System.Diagnostics.Process.GetCurrentProcess().ProcessName ))
+            //File.AppendAllText("I:\\mixin.log", sprintf "%s: checking project... \n" (System.Diagnostics.Process.GetCurrentProcess().ProcessName ))
             async{
                 let! results = checker.ParseAndCheckProject projOptions
                 processResults projFile results env
@@ -178,7 +178,7 @@ type MixinInjectionProvider() =
         let seekMode, seekPath = env.additionalData
         let results = projectScan seekMode seekPath |> List.map (checkProject env)
         
-        EvaluationSuccessful("let result = \"injection process cvompleted successfully\"")
+        EvaluationSuccessful("let result = \"injection process completed successfully\"")
 
     override this.AvailableTypes() = [| typeof<mixin_inject> |]
 

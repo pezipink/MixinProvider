@@ -84,9 +84,9 @@ module SquirrelMix =
     ///        the body of the member
     /// TODO - generic arguments
     let cmember memberType qualifier name args impl indentLevel =
-        let stat = memberType |> function Instance _ | InstanceOverride _ -> "" | _ -> "static "
-        let ident = memberType |> function Instance id | InstanceOverride id -> id | _ -> ""
-        let mem = memberType |> function InstanceOverride _ | StaticOverride -> "override " | _ -> "member "
+        let stat = memberType  |> function Instance _         | InstanceOverride _  -> ""          | _ -> "static "
+        let ident = memberType |> function Instance id        | InstanceOverride id -> id          | _ -> ""
+        let mem = memberType   |> function InstanceOverride _ | StaticOverride      -> "override " | _ -> "member "
         let signature = 
             match args with 
             | Partial args ->
@@ -104,10 +104,9 @@ module SquirrelMix =
     /// indentLevel+1 (this function should be formed from a composition of 
     /// cmember, cinterface etc)
     let cwithMembers impl indentLevel =
-        match impl with
-        | [] -> id
-        | fs -> indent indentLevel >> ap "with" >> newl 
-                >> mapPipe(fun f -> f (indentLevel+1) >> newl) fs
+        if Seq.isEmpty impl then id else 
+        indent indentLevel >> ap "with" >> newl 
+        >> mapPipe(fun f -> f (indentLevel+1) >> newl) impl
 
     /// todo:generics
     let ctype name args inheritFrom members indentLevel =
@@ -172,6 +171,11 @@ module SquirrelMix =
                         
                          (cmatchExpr expr guard indentLevel  (impl (indentLevel+1))) >> newl) cases
 
+    let cextension typeName members indentLevel =
+        indent indentLevel
+        >> ap "type " >> ap typeName >> newl
+        >> cwithMembers members indentLevel
+
     /// writes a let binding at the indent level, and calls
     /// (impl indentLevel+1) on a new line to write the implentation
     /// this is useful for let bindings that do not fit on the same line
@@ -231,9 +235,8 @@ module SquirrelMix =
         >> newl
         >> ap "#endif\r\n"
         
-    let copen opens indentLevel =
-        
-        ap (join "\r\n" (Seq.map (sprintf "open %s\r\n") opens)) >> newl
+    let copen opens indentLevel =        
+        ap (join "\r\n" (Seq.map (sprintf "open %s") opens)) >> newl
 
 
     /// creates an if .. then .. else expression, the functions 

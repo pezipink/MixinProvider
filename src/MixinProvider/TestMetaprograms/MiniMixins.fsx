@@ -40,7 +40,7 @@ let ctypeprovider (fileName:string, args)  =
         yield! args |> Seq.map(
             fun (name, ftype) -> 
                 match ftype.AbbreviatedType.TypeDefinition.QualifiedName with
-                | "System.Int32" -> api (sprintf "helpers.intParameter \"%s\" None" name)
+                | "System.Int32" ->  api (sprintf "helpers.intParameter \"%s\" None" name)
                 | "System.String" -> api (sprintf "helpers.stringParameter \"%s\" None" name)
                 | t -> failwithf "type %s is not supported in a mini-mixin" t) 
 
@@ -61,9 +61,9 @@ let ctypeprovider (fileName:string, args)  =
                 | t -> failwithf "type %s is not supported in a mini-mixin" t)
 
         // and these three are offset from the amount of generated arguments
-        yield clet "compileMode" (ap (sprintf "staticArguments.[%i] :?> CompileMode" args.Length))
+        yield clet "compileMode"    (ap (sprintf "staticArguments.[%i] :?> CompileMode"     args.Length))
         yield clet "generationMode" (ap (sprintf "staticArguments.[%i] :?> GenerationMode" (args.Length+1)))
-        yield clet "outputLoc"   (ap (sprintf "staticArguments.[%i] :?> string" (args.Length+2))) } 
+        yield clet "outputLoc   "   (ap (sprintf "staticArguments.[%i] :?> string"         (args.Length+2))) } 
 
     // define the arguments that are passed to the metaprogram as a string
     // here we simply join the arguments together using String.Join " "
@@ -149,9 +149,10 @@ let generate metaprogramPath =
     let typeProviders = metaprogramInfo |> Array.map ctypeprovider |> Array.toList
 
     (1,StringBuilder())
-    ||> ccode ( seq {
-         yield  copen ["Microsoft.FSharp.Core.CompilerServices";"MixinProvider";"MixinCompiler";"System"]
-         yield  genReferences [] ["MixinProvider.dll"]
-         yield! typeProviders
-         yield fun i -> ap "[<assembly:TypeProviderAssembly>] do ()"} )
+    ||> ccode ( seq {        
+        yield  newli
+        yield  copen ["Microsoft.FSharp.Core.CompilerServices";"MixinProvider";"MixinCompiler";"System"]
+        yield  genReferences [] ["MixinProvider.dll"]
+        yield! typeProviders
+        yield fun i -> ap "[<assembly:TypeProviderAssembly>] do ()"} )
     |> function sb -> sb.ToString()
