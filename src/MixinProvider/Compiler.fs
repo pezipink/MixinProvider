@@ -42,6 +42,13 @@ type CompileMode =
     /// This option is reccomended as a temporary switch if you
     /// wish to force recompilation for some reason
     | AlwaysCompile = 1
+    // AlwaysEvaluate will run the whole compilation pipeline
+    // if a matching output assembly is not found, otherwise it will
+    // always run the evaluation stage but not the compilation.
+    // This mode is primarily intedend for the injection mode or
+    // other uses that cause side effects with metaprograms but only
+    // generate dummy assemblies.
+    | AlwaysEvaluate = 2
     
 type GenerationMode =
     /// Default, would be used for most mixins
@@ -283,15 +290,18 @@ let fscCompile env source =
 type MixinCompiler() =
     let state = new Dictionary<_,MixinData>()
     
-    let internalCompile env evaluation compilation =
+    let internalCompile env evaluation compilation asm =
         match evaluation env with
         | EvaluationSuccessful programs ->
-            match compilation env programs with
-            | CompilationSuccessful asm -> 
-                if state.ContainsKey asm.FullName then state.Remove asm.FullName |> ignore
-                state.Add(asm.FullName,{assemblyLocation=env.dllFile; assembly=asm; metaprogramParams = env.metaprogramParams})
-                asm
-            | CompilationFail ex -> raise ex
+            match asm with
+            | Some asm -> asm
+            | _ -> 
+                match compilation env programs with
+                | CompilationSuccessful asm -> 
+                    if state.ContainsKey asm.FullName then state.Remove asm.FullName |> ignore
+                    state.Add(asm.FullName,{assemblyLocation=env.dllFile; assembly=asm; metaprogramParams = env.metaprogramParams})
+                    asm
+                | CompilationFail ex -> raise ex
         | EvaluationFailed ex -> raise ex
 
                                 
@@ -334,19 +344,18 @@ type MixinCompiler() =
                     state.Add(asmName, {assemblyLocation = dllFile; assembly = asm;  metaprogramParams = metaprogramParams; })
                     asm
                 else 
-                    internalCompile env evaluation compilation
-        | CompileMode.AlwaysCompile ->internalCompile env evaluation compilation
-//        | CompileMode.CompileWhenChanged -> 
-//            //let metaprogram = getSource()
-//            match state.TryGetValue asmName with
-//            | true, value when value.originalSource = metaprogram 
-//                            && value.assemblyLocation = dllFile 
-//                            && value.metaprogramParams = metaprogramParams ->
-//                state.[asmName].assembly
-//            | _ ->  match internalCompile asmName moduleName metaprogram metaprogramParams fsFile dllFile with
-//                    | Good asm -> asm
-//                    | Bad ex -> raise ex
-        
+                    internalCompile env evaluation compilation None
+        | CompileMode.AlwaysCompile ->internalCompile env evaluation compilation None
+        | CompileMode.AlwaysEvaluate -> 
+            let asm = 
+                if state.ContainsKey asmName && (state.[asmName].metaprogramParams = metaprogramParams) then Some state.[asmName].assembly
+                else
+                if File.Exists dllFile then 
+                    let asm = Assembly.LoadFrom dllFile
+                    state.Add(asmName, {assemblyLocation = dllFile; assembly = asm;  metaprogramParams = metaprogramParams; })
+                    Some asm
+                else None
+            internalCompile env evaluation compilation asm
         | _ -> failwith "impossible"
         
     

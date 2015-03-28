@@ -198,15 +198,22 @@ type MixinInjectionProvider() =
         let seekMode = staticArguments.[2] :?> ProjectSeekMode
         let wrapperType = WrapperType.Module moduleName
         File.AppendAllText("I:\\mixin.log", sprintf "%s: calling compile... \n" (System.Diagnostics.Process.GetCurrentProcess().ProcessName ))
-        this.ExecuteMixinCompile(
-            typeWithoutArguments, 
-            typePathWithArguments, 
-            metaprogram, 
-            wrapperType, 
-            CompileMode.CompileWhenMissisng, 
-            "", 
-            "",
-            injectMetaprogram,
-            MixinCompiler.fscCompile,
-            (seekMode,seekPath))
-
+        let resultType =
+            this.ExecuteMixinCompile(
+                typeWithoutArguments, 
+                typePathWithArguments, 
+                metaprogram, 
+                wrapperType, 
+                CompileMode.CompileWhenMissisng, 
+                "", 
+                "",
+                injectMetaprogram,
+                MixinCompiler.fscCompile,
+                (seekMode,seekPath))
+        // wait until the project has finished checking
+        // we need this as ther check async to avoid deadlocks
+        // but we don't want the compile to finish before
+        // the remaining work has completed 
+        while projectsCompiling.Count > 0 do
+            System.Threading.Thread.Sleep 100
+        resultType
