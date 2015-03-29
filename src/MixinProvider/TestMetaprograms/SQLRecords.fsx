@@ -52,12 +52,14 @@ let getData source =
             let y = Seq.map(getSqlEntities []) t.GenericArguments |> Seq.toList |> List.collect id
             y @ aux
         else aux
-
+        
     let toRecordTypeMeta (typeAlias) (t:FSharpType) =
         let name = sprintf "%s.dataContext.``%s``" typeAlias (t.TypeDefinition.CompiledName)
         let props = 
             t.TypeDefinition.MembersFunctionsAndValues
-            |> Seq.map(fun p -> p.CompiledName, p.FullType.ToString().Substring 5)
+            |> Seq.map(fun p -> 
+                let n = (p.FullType.ToString().Substring 5).Replace("Microsoft.FSharp.Core.[]", "array") 
+                p.CompiledName, n)
             |> Seq.filter(fun (_,t) -> not <| t.Contains("IQueryable"))
             |> Seq.toList
         { originalType = name; newType = t.TypeDefinition.CompiledName.Replace("[","").Replace("]","").Replace(".",""); properties = props }

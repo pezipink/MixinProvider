@@ -48,7 +48,7 @@ type MixinInjectionProvider() =
     // being async checked, and if the project is already being checked, we simply
     // allow processing to continue to the compilation stage.  Because the injection 
     // provider only returns a dummy assembly anyway, this works out quite nicely :)
-    static let checker = FSharpChecker.Create(keepAssemblyContents=true)
+    
     static let projectsCompiling = System.Collections.Concurrent.ConcurrentDictionary<string,FSharpProjectOptions>()    
     static let getEvalSession env =
         let sbOut = new StringBuilder()
@@ -94,45 +94,55 @@ type MixinInjectionProvider() =
              "mixin_inject4Attribute"
              "mixin_inject5Attribute"
              "mixin_inject_endAttribute"]
-       
-        let fsi,prefix = getEvalSession env
-        results.GetAllUsesOfAllSymbols() |> Async.RunSynchronously
-        |> Seq.filter(fun s -> List.exists ((=) s.Symbol.DisplayName) injectionNames)
-        |> Seq.groupBy(fun s -> s.FileName)
-        |> Seq.map(fun (fn,refs) -> fn, refs |> Seq.sortBy(fun s -> s.RangeAlternate.StartLine) |> Seq.toList)
-        |> Seq.map(fun (fn,refs) -> fn, refs |> List.partition(fun s -> s.Symbol.DisplayName.Contains("_end") = false))
-        |> Seq.map(fun (fn,refs) -> fn, refs ||> List.zip)
-        |> Seq.map(fun (fn,refs) -> 
-            let lines = System.IO.File.ReadAllLines fn
-            let lastIndex, newLines =
-                refs        
-                |> List.fold(fun (lastIndex,acc) (start, finish) ->
-                    let expr = 
-                        if prefix <> "" then
-                             sprintf "%s.%s %s" prefix ((lines.[start.RangeAlternate.StartLine-1].Substring(lines.[start.RangeAlternate.StartLine-1].IndexOf("=")+1)).Trim()) (sprintf "@\"%s\"" projectFile)
-                        else
-                             sprintf "%s %s" (lines.[start.RangeAlternate.StartLine-1].Substring(lines.[start.RangeAlternate.StartLine-1].IndexOf("=")+1)) (sprintf "@\"%s\"" projectFile)
-                    let program = 
-                        match fsi.EvalExpression(expr) with 
-                        | Some x -> 
-                            let source = x.ReflectionValue :?> string
-                            source.Split([|Environment.NewLine|], StringSplitOptions.None) |> Array.toList
-                        | _ -> []            
-                    let x = (lines.[lastIndex..start.RangeAlternate.StartLine-1] |> Array.toList) @ program
-                    (finish.RangeAlternate.StartLine,x))(0,[])
-            fn, newLines @ (lines.[lastIndex-1..] |> Array.toList))
-        |> Seq.iter(fun (fn,lines) -> System.IO.File.WriteAllLines(fn,lines))
-        
+         
+        try
+            let fsi,prefix = getEvalSession env
+            results.GetAllUsesOfAllSymbols() |> Async.RunSynchronously
+            |> Seq.filter(fun s -> List.exists ((=) s.Symbol.DisplayName) injectionNames)
+            |> Seq.groupBy(fun s -> s.FileName)
+            |> Seq.map(fun (fn,refs) -> fn, refs |> Seq.sortBy(fun s -> s.RangeAlternate.StartLine) |> Seq.toList)
+            |> Seq.map(fun (fn,refs) -> fn, refs |> List.partition(fun s -> s.Symbol.DisplayName.Contains("_end") = false))
+            |> Seq.map(fun (fn,refs) -> fn, refs ||> List.zip)
+            |> Seq.choose(fun (fn,refs) -> 
+                try
+                    let lines = System.IO.File.ReadAllLines fn
+                    let lastIndex, newLines =
+                        refs        
+                        |> List.fold(fun (lastIndex,acc) (start, finish) ->
+                            let expr = 
+                                if prefix <> "" then
+                                     sprintf "%s.%s %s" prefix ((lines.[start.RangeAlternate.StartLine-1].Substring(lines.[start.RangeAlternate.StartLine-1].IndexOf("=")+1)).Trim()) (sprintf "@\"%s\"" projectFile)
+                                else
+                                     sprintf "%s %s" (lines.[start.RangeAlternate.StartLine-1].Substring(lines.[start.RangeAlternate.StartLine-1].IndexOf("=")+1)) (sprintf "@\"%s\"" projectFile)
+                            let program = 
+                                match fsi.EvalExpression(expr) with 
+                                | Some x -> 
+                                    let source = x.ReflectionValue :?> string
+                                    source.Split([|Environment.NewLine|], StringSplitOptions.None) |> Array.toList
+                                | _ -> []            
+                            let x = (lines.[lastIndex..start.RangeAlternate.StartLine-1] |> Array.toList) @ program
+                            (finish.RangeAlternate.StartLine,x))(0,[])
+                    let newSource = newLines @ (lines.[lastIndex-1..] |> Array.toList)
+                    if lines.Length <> newSource.Length || Seq.forall2 (=) lines newSource = false then
+                        Some (fn, newSource)
+                    else None
+                with
+                | _ -> None)
+            
+            |> Seq.iter(fun (fn,lines) -> System.IO.File.WriteAllLines(fn,lines))
+        with
+        | _ -> ()
         projectsCompiling.TryRemove(projectFile) |> ignore
 
     let checkProject env projFile = 
+        if projectsCompiling.ContainsKey projFile then () else
+        let checker = FSharpChecker.Create(keepAssemblyContents=true)
         let projOptions = checker.GetProjectOptionsFromProjectFile projFile 
         match projectsCompiling.TryAdd(projFile,projOptions) with
         | true -> 
-            //File.AppendAllText("I:\\mixin.log", sprintf "%s: checking project... \n" (System.Diagnostics.Process.GetCurrentProcess().ProcessName ))
             async{
                 let! results = checker.ParseAndCheckProject projOptions
-                processResults projFile results env
+                processResults projFile results env                
             } |> Async.Start
         | false -> ()
 
@@ -189,6 +199,8 @@ type MixinInjectionProvider() =
             helpers.stringParameter "injectionMetaprogram" None  
             helpers.stringParameter "projectSeekPath" None
             helpers.genericOptionalParameter "projectSeekMode" ProjectSeekMode.Scan            
+            helpers.genericOptionalParameter "compileMode" CompileMode.AlwaysEvaluate
+            helpers.stringParameter "outputLocation" (Some "")
         |]
 
     override this.ApplyStaticArgs(typeWithoutArguments: Type, typePathWithArguments: string [], staticArguments: obj []): Type = 
@@ -196,16 +208,18 @@ type MixinInjectionProvider() =
         let metaprogram = helpers.resolveMetaprogram(staticArguments.[0] :?> string)
         let seekPath = staticArguments.[1] :?> string
         let seekMode = staticArguments.[2] :?> ProjectSeekMode
+        let compileMode = staticArguments.[3] :?>  CompileMode
+        let outputLoc = staticArguments.[4] :?>  string
         let wrapperType = WrapperType.Module moduleName
-        File.AppendAllText("I:\\mixin.log", sprintf "%s: calling compile... \n" (System.Diagnostics.Process.GetCurrentProcess().ProcessName ))
+        //File.AppendAllText("I:\\mixin.log", sprintf "%s: calling compile... \n" (System.Diagnostics.Process.GetCurrentProcess().ProcessName ))
         let resultType =
             this.ExecuteMixinCompile(
                 typeWithoutArguments, 
                 typePathWithArguments, 
                 metaprogram, 
                 wrapperType, 
-                CompileMode.CompileWhenMissisng, 
-                "", 
+                compileMode , 
+                outputLoc,
                 "",
                 injectMetaprogram,
                 MixinCompiler.fscCompile,
@@ -214,6 +228,6 @@ type MixinInjectionProvider() =
         // we need this as ther check async to avoid deadlocks
         // but we don't want the compile to finish before
         // the remaining work has completed 
-        while projectsCompiling.Count > 0 do
-            System.Threading.Thread.Sleep 100
+//        while projectsCompiling.Count > 0 do
+//            System.Threading.Thread.Sleep 100
         resultType
