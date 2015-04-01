@@ -66,7 +66,7 @@ module SquirrelGen =
         | Tuple of (string * string option) list
         | NoArgs  
 
-           /// creates a member defintion at the given indent level
+    /// creates a member defintion at the given indent level
     /// memberType - static, or instance with a self identifier value
     /// qualifer - any qualifiying string eg private
     /// name - the name of the member
@@ -112,13 +112,13 @@ module SquirrelGen =
         >> ap(wrapBraces (join "; " (List.map(fun (p,t) -> annoParam p t) fields))) >> newl
         >> cwithMembers members indentLevel
 
-
-    let instRecord assignments =
-        assignments 
-        |> List.map(fun (f,v) -> sprintf "%s = %s; " f v) 
-        |> join ""
-        |> wrapBraces
-        |> ap
+    /// instantiates a record type in the format  { f = v; f2 = v2 }
+    /// ignores indent level
+    let irecord = 
+        List.map(fun (f,v) -> sprintf "%s = %s; " f v) 
+        >> join ""
+        >> wrapBraces
+        >> ap
         
     /// creates a single union type case with any amount of type arguments
     /// that can optionally be named (F# 4)
@@ -136,16 +136,21 @@ module SquirrelGen =
         >> mapPipe (fun (name,args) -> indent (indentLevel+1) >> ap (cunionTypeCase name args) >> newl) cases
         >> cwithMembers members indentLevel
 
-    let cmatchExpr pattern guard impl =
+    let cmatchExpr pattern guard indentLevel impl =
         let guard = guard |> function None -> "" | Some g -> sprintf " when %s" g
-        ap "| " >> ap pattern >> ap guard >> impl
+        indent indentLevel  
+        >> ap "| " >> ap pattern >> ap guard >> impl
 
+    /// writes a match expresssion at indentLevel in the format 
+    /// match expr with ..
+    /// and then calls cmatchExpr on each case at indentLevel, 
+    /// applying (indentlevel+1) and a new line to each case function
     let cmatch expr cases indentLevel =
         indent indentLevel
         >> ap "match " >> ap expr >> ap " with" >> newl
         >> mapPipe (fun (expr,guard,impl) -> 
-                        indent (indentLevel+1)  
-                        >> (cmatchExpr expr guard (impl (indentLevel+1))) >> newl) cases
+                        
+                         (cmatchExpr expr guard indentLevel  (impl (indentLevel+1))) >> newl) cases
 
     /// writes a let binding at the indent level, and calls
     /// (impl indentLevel+1) on a new line to write the implentation
@@ -192,10 +197,10 @@ module SquirrelGen =
     /// just a dummy so the compiler ignores this block
     let genReferences references =
         let r loc = sprintf "#r @\"%s\"" loc
-        ap "#if MIXIN  \n" 
-        >> ap (join "\n" (List.map r references)) 
+        ap "#if MIXIN  \r\n" 
+        >> ap (join "\r\n" (List.map r references)) 
         >> newl
-        >> ap "#endif\n"
+        >> ap "#endif\r\n"
         
        
     /// creates an if .. then .. else expression, the functions 

@@ -5,6 +5,7 @@ open NUnit.Framework
 open System.Text
 open System.Diagnostics
 
+let cleanActual (s:string) = s.TrimEnd().Replace("\r\n","\n")
 
 [<Test>]
 let ``create module works`` () =
@@ -16,7 +17,7 @@ let ``create module works`` () =
     let expected = """module TestModule =
     let x = 1"""
 
-    Assert.AreEqual(sb.ToString().Trim(),expected)
+    Assert.AreEqual(cleanActual(sb.ToString()),expected)
 
 
 [<Test>]
@@ -31,7 +32,7 @@ let ``nested create module works`` () =
                 ]
             ] 
     |> ignore
-    let actual = sb.ToString().TrimEnd()
+    let actual = sb.ToString()
     let expected = """module TestModule =
     let x = 1
     module NestedModule =
@@ -39,7 +40,7 @@ let ``nested create module works`` () =
     
     Debug.WriteLine actual
     Debug.WriteLine expected
-    Assert.AreEqual(actual,expected, sprintf "expected:\n%s\nactual:\n%s" expected actual)
+    Assert.AreEqual(cleanActual actual,expected, sprintf "expected:\n%s\nactual:\n%s" expected actual)
 
 
 [<Test>]
@@ -54,13 +55,13 @@ let ``nested create module with initial indent works`` () =
                 ]
             ] 
     |> ignore
-    let actual = sb.ToString().TrimEnd()
+    let actual = sb.ToString()
     let expected = """    module TestModule =
         let x = 1
         module NestedModule =
             let y = 2"""
 
-    Assert.AreEqual(actual,expected, sprintf "expected:\n%s\nactual:\n%s" expected actual)
+    Assert.AreEqual(cleanActual actual,expected, sprintf "expected:\n%s\nactual:\n%s" expected actual)
 
 [<Test>]
 let ``squirrels``() =
