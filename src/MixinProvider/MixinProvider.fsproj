@@ -48,7 +48,7 @@
   <ItemGroup>
     <Compile Include="Compiler.fs" />
     <Compile Include="MixinProvider.fs" />
-    <Compile Include="SquirrelGen.fs" />
+    <Compile Include="SquirrelMix.fs" />
     <None Include="Script.fsx" />
     <None Include="paket.references" />
     <None Include="paket.template" />

@@ -1,4 +1,4 @@
-module MixinProvider.SquirrelGen.Tests
+module MixinProvider.SquirrelMix.Tests
 
 open MixinProvider
 open NUnit.Framework

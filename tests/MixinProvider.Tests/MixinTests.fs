@@ -8,10 +8,10 @@ open System.Diagnostics
 
 open MixinProvider
 
-type FirstTest = mixin_gen< """let generate() = "let x = 42" """ >
+//type FirstTest = mixin_gen< """let generate() = "let x = 42" """ >
 
 // generates a x = 42
-type Basic_Test = mixin_gen< "TestMetaprograms\\basic.fsx" >
+type Basic_Test = mixin_gen< "TestMetaprograms\\basic.fsx", outputLocation = @"C:\temp\" >
 
 
 // This is RECURSIVE! The DSL metaprogram also references
@@ -21,9 +21,9 @@ type Basic_Test = mixin_gen< "TestMetaprograms\\basic.fsx" >
 
 
 // generates a x = 25  (5 + 20!)
-type Test_Params = mixin_gen< "TestMetaprograms\\basic_params.fsx", metaprogramParameters = "5 20" >
+//type Test_Params = mixin_gen< "TestMetaprograms\\basic_params.fsx", metaprogramParameters = "5 20" >
 
 
-type ConnectionString_Test = mixin_gen<"TestMetaprograms\\connectionstring.fsx", metaprogramParameters = "\"John\"" >
+//type ConnectionString_Test = mixin_gen<"TestMetaprograms\\connectionstring.fsx", metaprogramParameters = "\"John\"" >
 
 //type Excel_Test = mixin_gen< "TestMetaprograms\\excel.fsx" >

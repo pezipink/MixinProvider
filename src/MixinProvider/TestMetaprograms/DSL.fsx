@@ -1,4 +1,4 @@
-﻿#load @"F:\GIT\MixinProvider\src\MixinProvider\SquirrelGen.fs"
+﻿#load @"F:\GIT\MixinProvider\src\MixinProvider\SquirrelMix.fs"
 #r @"F:\GIT\MixinProvider\bin\MixinProvider.dll"
 open System.Text
 open MixinProvider

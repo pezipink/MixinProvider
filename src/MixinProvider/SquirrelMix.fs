@@ -4,7 +4,7 @@
 namespace MixinProvider
 
 [<AutoOpen>]
-module SquirrelGen =
+module SquirrelMix =
     open System
     open System.Text
     type sb = StringBuilder
