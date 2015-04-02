@@ -11,7 +11,7 @@ open MixinProvider
 //type FirstTest = mixin_gen< """let generate() = "let x = 42" """ >
 
 // generates a x = 42
-type Basic_Test = mixin_gen< "TestMetaprograms\\basic.fsx", outputLocation = @"C:\temp\" >
+type Basic_Test = mixin_gen< "TestMetaprograms\\basic.fsx", outputLocation = @"..\bin\" >
 
 
 // This is RECURSIVE! The DSL metaprogram also references

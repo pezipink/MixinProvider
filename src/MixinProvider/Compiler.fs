@@ -210,9 +210,9 @@ type MixinCompiler() =
                 if String.IsNullOrWhiteSpace outputLoc then Path.Combine(current.FullName,moduleName)        
                 else
                 //resolve relative path name
-                let path =
-                    if Directory.Exists outputLoc then outputLoc
-                    else Path.GetFullPath(Path.Combine(current.FullName,outputLoc))
+                // note if they put an absolute path in like C:\\temp when you combine
+                // with current.FullName you get back the C:\\temp - result!
+                let path = Path.GetFullPath(Path.Combine(current.FullName,outputLoc))
                 Path.Combine(path,moduleName)
             let fsFile = Path.ChangeExtension(name, ".fs")
             let dllFile = Path.ChangeExtension(name, ".dll")          
