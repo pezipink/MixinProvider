@@ -9,18 +9,13 @@ open System.Collections.Generic
 open System.Reflection
 
 type CompilationResponse =
-    | CompilationSuccessful of Assembly
+    | CompilationSuccessful of string
     | CompilationFail of Exception
 
 type EvaluationResponse =
     | EvaluationSuccessful of program : string
     | EvaluationFailed of Exception
 
-type MixinData = 
-    { assemblyLocation : string
-      metaprogramParams : string
-      assembly : Assembly }
- 
 type ConfigurationMode =
     /// In debug mode the mixin compiler will output
     /// the generated DLLs with no optimisations, 
@@ -49,6 +44,8 @@ type CompileMode =
     // other uses that cause side effects with metaprograms but only
     // generate dummy assemblies.
     | AlwaysEvaluate = 2
+
+    | CompileWhenDifferent = 3
     
 type GenerationMode =
     /// Default, would be used for most mixins
@@ -59,9 +56,10 @@ type GenerationMode =
     /// Just want types in a namespace.
     | Namespace = 2
 
-type SourceType =
-    | File of string
-    | Text of string
+
+type MetaprogramType =
+    | File of fileName : string * source : string 
+    | Text of source : string
     | Other // this is for mixin tp extensions 
 
 type WrapperType =
@@ -75,19 +73,17 @@ type WrapperType =
         | AutoOpenModule s
         | Namespace s -> s
 
-type Environment<'a> = {
-    /// name and type of the wrapper module or namespace
-    /// this will be the type alias the user created the TP with
+type StaticParams = {
+    metaprogram : string
+    mpParams    : string
     wrapperType : WrapperType
-    /// metaprogram type and content
-    metaprogram : SourceType
-    /// static parameters for the metaprogram as a string
-    metaprogramParams : string
-    /// source file to write the pre-compiled program to
-    sourceFile : string
-    /// dll flie where the compiled program is written to
-    dllFile : string
-    /// some other data as defined by a mixin extension
+    compileMode : CompileMode
+    outputLoc   : string
+}
+
+type Environment<'a> = {
+    staticParams : StaticParams
+    metaprogram  : MetaprogramType  
     additionalData : 'a
 }
 
@@ -106,7 +102,7 @@ let evaluateWithFsi env =
     try
         let expr =
             match env.metaprogram with
-            | File filePath -> 
+            | File(filePath,source) -> 
                 // for some reason, trying including the file with --use in the fsi session's arguments
                 // simply does not work when hosted interactively - it just does nothing.  This is a bit
                 // of a pain, instead we will have to load the script and then call generate via the 
@@ -116,27 +112,33 @@ let evaluateWithFsi env =
                 let title =
                     if title.Length > 1 then string(Char.ToUpper(title.[0])) + title.Substring(1)
                     else string(Char.ToUpper(title.[0]))                
-                if String.IsNullOrWhiteSpace env.metaprogramParams then 
+                if String.IsNullOrWhiteSpace env.staticParams.mpParams then 
                     sprintf "%s.generate()" title
                 else 
-                    sprintf "%s.generate %s" title env.metaprogramParams
+                    sprintf "%s.generate %s" title env.staticParams.mpParams
             | Text sourceCode -> 
                 fsi.EvalInteraction sourceCode
-                if String.IsNullOrWhiteSpace env.metaprogramParams then 
+                if String.IsNullOrWhiteSpace env.staticParams.mpParams then 
                     "generate()"
                 else 
-                    sprintf "generate %s" env.metaprogramParams
+                    sprintf "generate %s" env.staticParams.mpParams
             | Other -> failwith "The metaprogram mode 'Other' is not supported in this type provider\nPlease make sure you have specified a valid metaprogram literal or location in the static parameters."
         match fsi.EvalExpression expr with
         | Some x -> 
             let source = x.ReflectionValue :?> string
-            EvaluationSuccessful(source)
+            EvaluationSuccessful(source), env
         | _ -> 
-            EvaluationFailed(new Exception("metaprogram failed to evaluate the generate function:\n" + sbErr.ToString()))
+            EvaluationFailed(new Exception("metaprogram failed to evaluate the generate function:\n" + sbErr.ToString())), env
     with
-    | ex -> EvaluationFailed(Exception("metaprogram failed to load:\n" + sbErr.ToString(), ex))
+    | ex -> EvaluationFailed(Exception("metaprogram failed to load:\n" + sbErr.ToString(), ex)), env
+
+let getWrappedSource source wrapperType =
+    match wrapperType with
+    | WrapperType.AutoOpenModule moduleName -> sprintf "[<AutoOpen>]module %s\n%s" moduleName source
+    | WrapperType.Module moduleName -> sprintf "module %s\n%s" moduleName source
+    | WrapperType.Namespace moduleName -> sprintf "namespace %s\n%s" moduleName source
    
-let fscCompile env source = 
+let fscCompile program destFile destDll wrapperType  = 
     let (++) path1 path2 = Path.Combine(path1, path2)
     // In Mono all the files we need are actually in one place
     // but in .NET the FSharp.Core.dll is in another castle
@@ -258,104 +260,28 @@ let fscCompile env source =
                                     r imatches
             )
 
-        let source =
-            match env.wrapperType with
-            | WrapperType.AutoOpenModule moduleName -> sprintf "[<AutoOpen>]module %s\n%s" moduleName source
-            | WrapperType.Module moduleName -> sprintf "module %s\n%s" moduleName source
-            | WrapperType.Namespace moduleName -> sprintf "namespace %s\n%s" moduleName source
+        let source = getWrappedSource source wrapperType 
         source, references
                    
     let generateReferences references = List.fold(fun acc l -> "-r" :: l :: acc) [] (defaultReferences @ references)
-    let args output references = 
-        [ "fsc.exe"; "-o"; output; "-a"; env.sourceFile; "--noframework"; "--validate-type-providers"; "--fullpaths"; "--flaterrors"; "--debug:full" ] 
+    let args references = 
+        [ "fsc.exe"; "-o"; destDll; "-a"; destFile; "--noframework"; "--validate-type-providers"; "--fullpaths"; "--flaterrors"; "--debug:full" ] 
         @ generateReferences references
         |> List.toArray
     
     try                           
         try
-            if File.Exists env.sourceFile then File.Delete env.sourceFile
-            if File.Exists env.dllFile then File.Delete env.dllFile
+            if File.Exists destFile then File.Delete destFile
+            if File.Exists destDll then File.Delete destDll
         with
         | _ -> raise <| Exception("Could not delete old assembly. If you are running in visual studio, you must not have the source file where you create the type provider open, as the background compiler will lock the assembly (this is mostly a problem when you are using CompileAlways mode). Close the source file, restart the IDE and compile the project to avoid this.")  
-        let source, refs = preparedProgram source
-        File.WriteAllText(env.sourceFile,source)
-        let args = args env.dllFile refs
+        let source, refs = preparedProgram program
+        File.WriteAllText(destFile,source)
+        let args = args refs
         let errors, code = fsc.Compile args
         if code > 0 then CompilationFail(Exception(String.Join("\n",errors))) else
-        let asm = Assembly.LoadFrom env.dllFile
-        CompilationSuccessful asm
+        CompilationSuccessful destDll
     with
     | ex -> CompilationFail ex
     
-type MixinCompiler() =
-    let state = new Dictionary<_,MixinData>()
-    
-    let internalCompile env evaluation compilation asm =
-        match evaluation env with
-        | EvaluationSuccessful programs ->
-            match asm with
-            | Some asm -> asm
-            | _ -> 
-                match compilation env programs with
-                | CompilationSuccessful asm -> 
-                    if state.ContainsKey asm.FullName then state.Remove asm.FullName |> ignore
-                    state.Add(asm.FullName,{assemblyLocation=env.dllFile; assembly=asm; metaprogramParams = env.metaprogramParams})
-                    asm
-                | CompilationFail ex -> raise ex
-        | EvaluationFailed ex -> raise ex
 
-                                
-    member this.Compile(metaprogram,wrapperType:WrapperType,mode,outputLoc,metaprogramParams,evaluation,compilation,additionalEnvironmentData) =        
-        let asmName = sprintf "%s, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null" wrapperType.ModuleName
-        let current = FileInfo(Assembly.GetExecutingAssembly().Location).Directory
-        let metaFileLoc = try Path.Combine(current.FullName,metaprogram) with _ -> ""
-        let fsFile, dllFile = 
-            let name =
-                if String.IsNullOrWhiteSpace outputLoc then Path.Combine(current.FullName,wrapperType.ModuleName)        
-                else
-                //resolve relative path name
-                // note if they put an absolute path in like C:\\temp when you combine
-                // with current.FullName you get back the C:\\temp - result!
-                let path = Path.GetFullPath(Path.Combine(current.FullName,outputLoc))
-                Path.Combine(path,wrapperType.ModuleName)
-            let fsFile = Path.ChangeExtension(name, ".fs")
-            let dllFile = Path.ChangeExtension(name, ".dll")          
-            fsFile,dllFile
-        
-        let source =
-            if String.IsNullOrWhiteSpace metaprogram then Other
-            else try if File.Exists metaFileLoc then File metaFileLoc else Text metaprogram
-                 with _ -> Text metaprogram
-         
-        let env = {
-            wrapperType = wrapperType
-            metaprogram = source
-            metaprogramParams = metaprogramParams
-            sourceFile = fsFile
-            dllFile = dllFile
-            additionalData = additionalEnvironmentData }
-
-        match mode with 
-        | CompileMode.CompileWhenMissisng ->
-            if state.ContainsKey asmName && (state.[asmName].metaprogramParams = metaprogramParams) then state.[asmName].assembly
-            else
-                if File.Exists dllFile then 
-                    let asm = Assembly.LoadFrom dllFile
-                    state.Add(asmName, {assemblyLocation = dllFile; assembly = asm;  metaprogramParams = metaprogramParams; })
-                    asm
-                else 
-                    internalCompile env evaluation compilation None
-        | CompileMode.AlwaysCompile ->internalCompile env evaluation compilation None
-        | CompileMode.AlwaysEvaluate -> 
-            let asm = 
-                if state.ContainsKey asmName && (state.[asmName].metaprogramParams = metaprogramParams) then Some state.[asmName].assembly
-                else
-                if File.Exists dllFile then 
-                    let asm = Assembly.LoadFrom dllFile
-                    state.Add(asmName, {assemblyLocation = dllFile; assembly = asm;  metaprogramParams = metaprogramParams; })
-                    Some asm
-                else None
-            internalCompile env evaluation compilation asm
-        | _ -> failwith "impossible"
-        
-    

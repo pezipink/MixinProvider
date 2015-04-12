@@ -126,10 +126,8 @@ module SquirrelMix =
     ///and optionally a function list with member / interface implementations
     let crecord name fields members indentLevel =
         indent indentLevel 
-        >> ap "type " >> ap name >> space >> ap " = {" >> newl
-        >> mapPipe(fun (p,t) ->  (indent (indentLevel+1)) >> ap(annoParam p t) >> newl ) fields
-        >> indent indentLevel >> ap "}" >> newl
-        //>> ap(wrapBraces (join "; " (Seq.map(fun (p,t) -> annoParam p t) fields))) >> newl
+        >> ap "type " >> ap name >> space >> ap " = "
+        >> ap(wrapBraces (join "; " (Seq.map(fun (p,t) -> annoParam p t) fields))) >> newl
         >> cwithMembers members indentLevel
 
     /// instantiates a record type in the format  { f = v; f2 = v2 }

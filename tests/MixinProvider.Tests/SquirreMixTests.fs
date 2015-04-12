@@ -7,6 +7,7 @@ open System.Diagnostics
 
 let clean (s:string) = s.TrimEnd().Replace("\r\n","\n")
 
+
 [<Test>]
 let ``create module works`` () =
     let sb = new StringBuilder()

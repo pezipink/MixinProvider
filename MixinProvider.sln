@@ -1,6 +1,7 @@
-
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 2012
+# Visual Studio 2013
+VisualStudioVersion = 12.0.31101.0
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".paket", ".paket", "{63297B98-5CED-492C-A5B7-A5B4F73CF142}"
 	ProjectSection(SolutionItems) = preProject
 		paket.dependencies = paket.dependencies
@@ -33,6 +34,9 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{ED8079DD-2B06-4030-9F0F-DC548F98E1C4}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "MixinProvider.Tests", "tests\MixinProvider.Tests\MixinProvider.Tests.fsproj", "{44144752-D56C-4B65-B656-E77346C24A8E}"
+	ProjectSection(ProjectDependencies) = postProject
+		{9E952CEA-BD8C-42A5-8C20-743D5C2EE1A1} = {9E952CEA-BD8C-42A5-8C20-743D5C2EE1A1}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

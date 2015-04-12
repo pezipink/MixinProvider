@@ -47,8 +47,10 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Compiler.fs" />
-    <Compile Include="MixinProvider.fs" />
+    <Compile Include="MixinBase.fs" />
+    <Compile Include="MixinCTFE.fs" />
     <Compile Include="MixinInjectionProvider.fs" />
+    <Compile Include="MixinFull.fs" />
     <Compile Include="SquirrelMix.fs" />
     <None Include="Script.fsx" />
     <None Include="paket.references" />
