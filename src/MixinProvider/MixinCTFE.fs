@@ -68,7 +68,8 @@ type MixinCTFEProvider() =
             else true
         | _ -> true
             
-    override this.GetAsm(env) = this.GetAsmFromState env
+    override this.GetAsm(env) = 
+         (this.TryGetOrLoadAsm env.staticParams.wrapperType.ModuleName (snd env.additionalData)).Value
 
     override this.Compile(program,env) =
         match MixinCompiler.fscCompile program (fst env.additionalData) (snd env.additionalData) env.staticParams.wrapperType with
