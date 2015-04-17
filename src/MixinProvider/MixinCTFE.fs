@@ -29,7 +29,7 @@ type MixinCTFEProvider() =
         [| 
             helpers.stringParameter "metaprogram" None;                
             helpers.stringParameter "metaprogramParameters" (Some "");
-            helpers.genericOptionalParameter "compileMode" CompileMode.CompileWhenDifferent
+            helpers.genericOptionalParameter "compileMode" CompileMode.CompileWhenMissisng
             helpers.genericOptionalParameter "generationMode" GenerationMode.AutoOpenModule
             helpers.stringParameter "outputLocation" (Some "")
         |]
@@ -52,21 +52,21 @@ type MixinCTFEProvider() =
 
     
     override this.PreEvaluate env =         
-        let real = File.Exists (fst env.additionalData)
+        let real = File.Exists (snd env.additionalData)
         if env.staticParams.compileMode = CompileMode.CompileWhenMissisng && real then false else
         true
     
     override this.Evaluate env =
         MixinCompiler.evaluateWithFsi env
     
-    override this.PreCompile(program,env) =
-        match env.staticParams.compileMode with
-        | CompileMode.CompileWhenDifferent when File.Exists(snd env.additionalData) -> 
-            if File.ReadAllText(snd env.additionalData) = program then 
-              this.TryGetOrLoadAsm(env.staticParams.wrapperType.ModuleName) (snd env.additionalData)|>ignore
-              false
-            else true
-        | _ -> true
+    override this.PreCompile(program,env) = true
+//        match env.staticParams.compileMode with
+//        | CompileMode.CompileWhenDifferent when File.Exists(fst env.additionalData) -> 
+//            if File.ReadAllText(snd env.additionalData) = program then 
+//              this.TryGetOrLoadAsm(env.staticParams.wrapperType.ModuleName) (snd env.additionalData)|>ignore
+//              false
+//            else true
+//        | _ -> true
             
     override this.GetAsm(env) = 
          (this.TryGetOrLoadAsm env.staticParams.wrapperType.ModuleName (snd env.additionalData)).Value
