@@ -224,7 +224,7 @@ type MixinInjectionProvider() =
         // but we don't want the compile to finish before
         // the remaining work has completed 
 //        while projectsCompiling.Count > 0 do
-//            System.Threading.Thread.Sleep 100
+//            System.Threading.Thread.SpinWait 100
 
         resultType
 
