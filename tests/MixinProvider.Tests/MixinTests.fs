@@ -15,7 +15,7 @@ let woah = """let generate() = "type syes<'a> = { x:int; y: 'a }" """
 let woahh = "let generate() = \"let [<Literal>]program = \"let generate() = \"type yes<'a> = { x:int; y: 'a }\" \" "
 
 let hello = ""
-type WTF2 = mixin_ctfe< woah, compileMode=MixinCompiler.CompileMode.CompileWhenDifferent >
+type WTF2 = mixin_ctfe< woah, compileMode=MixinCompiler.CompileMode.CompileWhenMissisng>
 
 //type Full_Test = mixin_full<woah>
 //let a = { x = 5; y = true}
@@ -38,11 +38,11 @@ type WTF2 = mixin_ctfe< woah, compileMode=MixinCompiler.CompileMode.CompileWhenD
 
 
 
-// generates a x = 25  (5 + 20!)
-type Test_Params = mixin_ctfe< "TestMetaprograms/basic_params.fsx", metaprogramParameters = "5 20" >
-//
-//
-type ConnectionString_Test = mixin_ctfe<"TestMetaprograms/connectionstring.fsx", metaprogramParameters = "\"Dave\"" >
+//// generates a x = 25  (5 + 20!)
+//type Test_Params = mixin_ctfe< "TestMetaprograms/basic_params.fsx", metaprogramParameters = "5 20" >
+////
+////
+//type ConnectionString_Test = mixin_ctfe<"TestMetaprograms/connectionstring.fsx", metaprogramParameters = "\"Dave\"" >
 //
 //ConnectionString_Test.
 
