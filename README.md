@@ -18,7 +18,7 @@ This mode of operation is largely aimed at an odd form of "Compile Time Function
 
 This mode is the most similar to a traditional F# type provider.  Simply alias the `mixin_ctfe` type and pass it a metaprgoram as a static parameter, and then in the same program you can access the data it has generated exactly like a normal type provider.
 
-* You can execute a arbitarily powerful metaprogram and get straight at the results from the type provider exactly like a generative type provider
+* You can execute a arbitrarily powerful metaprogram and get straight at the results from the type provider exactly like a generative type provider
 * No provided types API, your program simply generates the F# code you require.  There is a compositional code generation DSL to help you with this
 * This mode is particularly useful for generating [<Literal>] values at compile time to pass as static parameters to other F# type providers, and pre-calculating lookup tables or other heavy operations that are able to be executed at compile time.
 * If you throw an exception in the metaprogram, the compilation will fail - this gives you a kind of compile-time assertion which can be useful in a variety of situations.
